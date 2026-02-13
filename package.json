@@ -1,0 +1,13 @@
+{
+  "name": "mujoco-js-playground",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild ./src/main.js --bundle --sourcemap --format=esm --outdir=./build --platform=browser",
+    "dev": "npx serve . -p 8080"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.12",
+    "three": "^0.182.0"
+  }
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mujoco-js playground</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1115; color: #e7ecf3; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      #ui { position: fixed; top: 12px; left: 12px; z-index: 10; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; }
+      select, button { background: #171a21; color: #e7ecf3; border: 1px solid #333a48; border-radius: 8px; padding: 8px 10px; }
+      #status { font-size: 12px; color: #b8c2d4; min-width: 220px; }
+      #app { width: 100vw; height: 100vh; }
+    </style>
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.181.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="ui">
+      <select id="scene-select">
+        <option value="humanoid.xml">humanoid.xml</option>
+        <option value="unitree/go2_scene.xml">unitree/go2_scene.xml (add file)</option>
+      </select>
+      <button id="btn-reset">Reset</button>
+      <div id="status">Loading MuJoCo...</div>
+    </div>
+    <div id="app"></div>
+    <script type="module" src="./build/main.js"></script>
+  </body>
+</html>
