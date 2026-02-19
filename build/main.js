@@ -28999,6 +28999,7 @@ scene.add(new HemisphereLight(16777215, 2241348, 1));
 var dirLight = new DirectionalLight(16777215, 1.2);
 dirLight.position.set(3, 5, 3);
 dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
 var camera = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
 camera.position.set(3, 2, 3);
@@ -29276,10 +29277,10 @@ function handleInput() {
     onnxController.setCommand(linX, linY, angZ);
     let neckPitch = onnxController.defaultNeckPitchCommand;
     let headYaw = 0;
-    if (keys["Digit1"]) neckPitch = 0.5;
-    if (keys["Digit2"]) neckPitch = -0.2;
-    if (Math.abs(headY) > 0.1) neckPitch = headY * 0.5;
-    if (Math.abs(headX) > 0.1) headYaw = -headX * 0.8;
+    if (keys["Digit1"]) neckPitch = 0.8;
+    if (keys["Digit2"]) neckPitch = -0.3;
+    if (Math.abs(headY) > 0.1) neckPitch = headY * 0.8;
+    if (Math.abs(headX) > 0.1) headYaw = -headX * 1;
     onnxController.commands[3] = neckPitch;
     onnxController.commands[5] = headYaw;
   }
@@ -29420,7 +29421,7 @@ function setupTouch() {
   const headJBase = document.getElementById("head-jbase");
   const headJThumb = document.getElementById("head-jthumb");
   if (headJoystick && headJBase && headJThumb) {
-    const hR = 35, hT = 15, hMax = 25;
+    const hR = 45, hT = 18, hMax = 30;
     let headTid = null;
     const updateHead = (x, y) => {
       const r = headJBase.getBoundingClientRect();

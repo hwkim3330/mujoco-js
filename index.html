@@ -63,19 +63,19 @@
       .mb-row { display: flex; gap: 10px; }
 
       /* Head control joystick (mobile) */
-      #head-joystick { touch-action: none; }
+      #head-joystick, #head-jbase, #head-jthumb { touch-action: none; }
       #head-jbase {
-        width: 70px; height: 70px; border-radius: 50%;
-        background: rgba(255,255,255,0.06); border: 2px solid rgba(255,200,100,0.25);
+        width: 90px; height: 90px; border-radius: 50%;
+        background: rgba(255,200,100,0.08); border: 2px solid rgba(255,200,100,0.3);
         position: relative;
       }
       #head-jthumb {
-        width: 30px; height: 30px; border-radius: 50%;
-        background: rgba(255,200,100,0.4); border: 2px solid rgba(255,200,100,0.6);
-        position: absolute; top: 20px; left: 20px;
+        width: 36px; height: 36px; border-radius: 50%;
+        background: rgba(255,200,100,0.45); border: 2px solid rgba(255,200,100,0.65);
+        position: absolute; top: 27px; left: 27px;
         pointer-events: none;
       }
-      #head-joystick .label { font-size: 9px; color: #666; text-align: center; margin-top: 2px; }
+      #head-joystick .label { font-size: 9px; color: #887744; text-align: center; margin-top: 2px; }
 
       @media (max-width: 768px) {
         #help-overlay { display: none; }

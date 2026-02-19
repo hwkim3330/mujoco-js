@@ -31,6 +31,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.0));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
 dirLight.position.set(3, 5, 3);
 dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
 scene.add(dirLight);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
@@ -381,10 +382,10 @@ function handleInput() {
     // Head control (joystick or keyboard 1/2)
     let neckPitch = onnxController.defaultNeckPitchCommand;
     let headYaw = 0;
-    if (keys['Digit1']) neckPitch = 0.5;
-    if (keys['Digit2']) neckPitch = -0.2;
-    if (Math.abs(headY) > 0.1) neckPitch = headY * 0.5;
-    if (Math.abs(headX) > 0.1) headYaw = -headX * 0.8;
+    if (keys['Digit1']) neckPitch = 0.8;
+    if (keys['Digit2']) neckPitch = -0.3;
+    if (Math.abs(headY) > 0.1) neckPitch = headY * 0.8;
+    if (Math.abs(headX) > 0.1) headYaw = -headX * 1.0;
     onnxController.commands[3] = neckPitch;
     onnxController.commands[5] = headYaw;
   }
@@ -565,7 +566,7 @@ function setupTouch() {
   const headJThumb = document.getElementById('head-jthumb');
 
   if (headJoystick && headJBase && headJThumb) {
-    const hR = 35, hT = 15, hMax = 25;
+    const hR = 45, hT = 18, hMax = 30;
     let headTid = null;
 
     const updateHead = (x, y) => {
