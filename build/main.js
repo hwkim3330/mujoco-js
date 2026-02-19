@@ -29259,16 +29259,15 @@ function setupTouch() {
   const joystickZone = document.getElementById("joystick-zone");
   const joystickBase = document.getElementById("joystick-base");
   const joystickThumb = document.getElementById("joystick-thumb");
-  const mobileBtns = document.getElementById("mobile-btns");
-  const rotateZone = document.getElementById("rotate-zone");
+  const mobilePanel = document.getElementById("mobile-panel");
   const helpOverlayEl = document.getElementById("help-overlay");
   if (joystickZone) joystickZone.style.display = "block";
-  if (mobileBtns) mobileBtns.style.display = "flex";
-  if (rotateZone) rotateZone.style.display = "flex";
+  if (mobilePanel) mobilePanel.style.display = "flex";
   if (helpOverlayEl) helpOverlayEl.style.display = "none";
   if (joystickBase && joystickThumb) {
-    const baseRadius = 70;
-    const maxDist = 45;
+    const baseRadius = 65;
+    const thumbHalf = 24;
+    const maxDist = 40;
     let joystickActive = false;
     const updateThumb = (clientX, clientY) => {
       const rect = joystickBase.getBoundingClientRect();
@@ -29281,14 +29280,14 @@ function setupTouch() {
         dx = dx / dist * maxDist;
         dy = dy / dist * maxDist;
       }
-      joystickThumb.style.left = baseRadius - 25 + dx + "px";
-      joystickThumb.style.top = baseRadius - 25 + dy + "px";
+      joystickThumb.style.left = baseRadius - thumbHalf + dx + "px";
+      joystickThumb.style.top = baseRadius - thumbHalf + dy + "px";
       touchX = dx / maxDist;
       touchY = -dy / maxDist;
     };
     const resetThumb = () => {
-      joystickThumb.style.left = "45px";
-      joystickThumb.style.top = "45px";
+      joystickThumb.style.left = baseRadius - thumbHalf + "px";
+      joystickThumb.style.top = baseRadius - thumbHalf + "px";
       touchX = 0;
       touchY = 0;
       joystickActive = false;
@@ -29296,50 +29295,50 @@ function setupTouch() {
     joystickZone.addEventListener("touchstart", (e) => {
       e.preventDefault();
       joystickActive = true;
-      const t = e.touches[0];
-      updateThumb(t.clientX, t.clientY);
+      updateThumb(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: false });
     joystickZone.addEventListener("touchmove", (e) => {
       e.preventDefault();
       if (!joystickActive) return;
-      const t = e.touches[0];
-      updateThumb(t.clientX, t.clientY);
+      updateThumb(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: false });
     joystickZone.addEventListener("touchend", (e) => {
       e.preventDefault();
       resetThumb();
     }, { passive: false });
-    joystickZone.addEventListener("touchcancel", (e) => {
-      resetThumb();
-    });
+    joystickZone.addEventListener("touchcancel", resetThumb);
   }
-  if (rotateZone) {
-    rotateZone.querySelectorAll(".rot-btn").forEach((btn) => {
+  if (mobilePanel) {
+    mobilePanel.querySelectorAll("[data-action]").forEach((btn) => {
       const action = btn.dataset.action;
-      btn.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        if (action === "rotL") touchRotL = true;
-        if (action === "rotR") touchRotR = true;
-      }, { passive: false });
-      btn.addEventListener("touchend", (e) => {
-        e.preventDefault();
-        if (action === "rotL") touchRotL = false;
-        if (action === "rotR") touchRotR = false;
-      }, { passive: false });
-      btn.addEventListener("touchcancel", () => {
-        touchRotL = false;
-        touchRotR = false;
-      });
-    });
-  }
-  if (mobileBtns) {
-    mobileBtns.querySelectorAll(".mobile-btn").forEach((btn) => {
-      const action = btn.dataset.action;
-      btn.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-        if (action === "reset") resetScene();
-        if (action === "toggle") toggleController();
-      }, { passive: false });
+      if (action === "rotL" || action === "rotR") {
+        btn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          if (action === "rotL") touchRotL = true;
+          if (action === "rotR") touchRotR = true;
+        }, { passive: false });
+        btn.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          if (action === "rotL") touchRotL = false;
+          if (action === "rotR") touchRotR = false;
+        }, { passive: false });
+        btn.addEventListener("touchcancel", () => {
+          touchRotL = false;
+          touchRotR = false;
+        });
+      }
+      if (action === "reset") {
+        btn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          resetScene();
+        }, { passive: false });
+      }
+      if (action === "toggle") {
+        btn.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          toggleController();
+        }, { passive: false });
+      }
     });
   }
 }

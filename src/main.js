@@ -368,20 +368,19 @@ function setupTouch() {
   const joystickZone = document.getElementById('joystick-zone');
   const joystickBase = document.getElementById('joystick-base');
   const joystickThumb = document.getElementById('joystick-thumb');
-  const mobileBtns = document.getElementById('mobile-btns');
-  const rotateZone = document.getElementById('rotate-zone');
+  const mobilePanel = document.getElementById('mobile-panel');
   const helpOverlayEl = document.getElementById('help-overlay');
 
   // Show mobile UI, hide desktop help
   if (joystickZone) joystickZone.style.display = 'block';
-  if (mobileBtns) mobileBtns.style.display = 'flex';
-  if (rotateZone) rotateZone.style.display = 'flex';
+  if (mobilePanel) mobilePanel.style.display = 'flex';
   if (helpOverlayEl) helpOverlayEl.style.display = 'none';
 
   // Virtual joystick
   if (joystickBase && joystickThumb) {
-    const baseRadius = 70; // half of 140px
-    const maxDist = 45;    // max thumb travel
+    const baseRadius = 65; // half of 130px
+    const thumbHalf = 24;  // half of 48px
+    const maxDist = 40;
 
     let joystickActive = false;
 
@@ -396,17 +395,15 @@ function setupTouch() {
         dx = (dx / dist) * maxDist;
         dy = (dy / dist) * maxDist;
       }
-      joystickThumb.style.left = (baseRadius - 25 + dx) + 'px';
-      joystickThumb.style.top = (baseRadius - 25 + dy) + 'px';
-
-      // Normalize to -1..1
+      joystickThumb.style.left = (baseRadius - thumbHalf + dx) + 'px';
+      joystickThumb.style.top = (baseRadius - thumbHalf + dy) + 'px';
       touchX = dx / maxDist;
-      touchY = -dy / maxDist; // Y up = forward
+      touchY = -dy / maxDist;
     };
 
     const resetThumb = () => {
-      joystickThumb.style.left = '45px';
-      joystickThumb.style.top = '45px';
+      joystickThumb.style.left = (baseRadius - thumbHalf) + 'px';
+      joystickThumb.style.top = (baseRadius - thumbHalf) + 'px';
       touchX = 0;
       touchY = 0;
       joystickActive = false;
@@ -415,15 +412,13 @@ function setupTouch() {
     joystickZone.addEventListener('touchstart', (e) => {
       e.preventDefault();
       joystickActive = true;
-      const t = e.touches[0];
-      updateThumb(t.clientX, t.clientY);
+      updateThumb(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: false });
 
     joystickZone.addEventListener('touchmove', (e) => {
       e.preventDefault();
       if (!joystickActive) return;
-      const t = e.touches[0];
-      updateThumb(t.clientX, t.clientY);
+      updateThumb(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: false });
 
     joystickZone.addEventListener('touchend', (e) => {
@@ -431,41 +426,38 @@ function setupTouch() {
       resetThumb();
     }, { passive: false });
 
-    joystickZone.addEventListener('touchcancel', (e) => {
-      resetThumb();
-    });
+    joystickZone.addEventListener('touchcancel', resetThumb);
   }
 
-  // Rotation buttons
-  if (rotateZone) {
-    rotateZone.querySelectorAll('.rot-btn').forEach(btn => {
+  // All buttons in the right panel (unified: rotation + actions)
+  if (mobilePanel) {
+    mobilePanel.querySelectorAll('[data-action]').forEach(btn => {
       const action = btn.dataset.action;
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (action === 'rotL') touchRotL = true;
-        if (action === 'rotR') touchRotR = true;
-      }, { passive: false });
-      btn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        if (action === 'rotL') touchRotL = false;
-        if (action === 'rotR') touchRotR = false;
-      }, { passive: false });
-      btn.addEventListener('touchcancel', () => {
-        touchRotL = false;
-        touchRotR = false;
-      });
-    });
-  }
 
-  // Action buttons
-  if (mobileBtns) {
-    mobileBtns.querySelectorAll('.mobile-btn').forEach(btn => {
-      const action = btn.dataset.action;
-      btn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (action === 'reset') resetScene();
-        if (action === 'toggle') toggleController();
-      }, { passive: false });
+      // Rotation: hold to rotate
+      if (action === 'rotL' || action === 'rotR') {
+        btn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (action === 'rotL') touchRotL = true;
+          if (action === 'rotR') touchRotR = true;
+        }, { passive: false });
+        btn.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          if (action === 'rotL') touchRotL = false;
+          if (action === 'rotR') touchRotR = false;
+        }, { passive: false });
+        btn.addEventListener('touchcancel', () => {
+          touchRotL = false; touchRotR = false;
+        });
+      }
+
+      // Tap actions
+      if (action === 'reset') {
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); resetScene(); }, { passive: false });
+      }
+      if (action === 'toggle') {
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleController(); }, { passive: false });
+      }
     });
   }
 }
