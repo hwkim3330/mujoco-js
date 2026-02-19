@@ -69,8 +69,8 @@ export class CpgController {
     this.jntIdx = {};
     this.findJointIndices();
 
-    // Commands
-    this.forwardSpeed = 0.5;     // Target forward velocity (0-1 scale)
+    // Commands — start in standing mode (user presses W to walk)
+    this.forwardSpeed = 0;
     this.lateralSpeed = 0;
     this.turnRate = 0;
 

@@ -226,21 +226,16 @@ function handleKeyboard() {
   }
 
   if (activeController === 'cpg' && cpgController && cpgController.enabled) {
-    let fwd = 0.5;
+    let fwd = 0;
     let lat = 0;
     let turn = 0;
 
-    if (keys['KeyW'] || keys['ArrowUp']) fwd = 1.0;
-    if (keys['KeyS'] || keys['ArrowDown']) fwd = -0.5;
+    if (keys['KeyW'] || keys['ArrowUp']) fwd = 0.8;
+    if (keys['KeyS'] || keys['ArrowDown']) fwd = -0.4;
     if (keys['KeyA'] || keys['ArrowLeft']) lat = 0.3;
     if (keys['KeyD'] || keys['ArrowRight']) lat = -0.3;
     if (keys['KeyQ']) turn = 0.5;
     if (keys['KeyE']) turn = -0.5;
-
-    // Stop walking when no movement keys are pressed
-    if (!keys['KeyW'] && !keys['ArrowUp'] && !keys['KeyS'] && !keys['ArrowDown']) {
-      fwd = 0;
-    }
 
     cpgController.setCommand(fwd, lat, turn);
   }
@@ -341,26 +336,36 @@ function followCamera() {
     return;
   }
 
+  // Real-time physics: run enough substeps per frame to match wall-clock time.
+  // MuJoCo timestep: 0.002s (500Hz) for OpenDuck/H1, 0.005s (200Hz) for humanoid.
+  const MAX_SUBSTEPS = 20; // Safety cap to prevent freeze on slow frames
+
   function animate() {
     requestAnimationFrame(animate);
 
     if (model && data && !paused) {
       handleKeyboard();
 
-      // Physics step
-      mujoco.mj_step(model, data);
-      stepCounter++;
+      const timestep = model.opt.timestep;
+      const frameDt = 1.0 / 60.0; // Target 60fps real-time
+      const nsteps = Math.min(Math.round(frameDt / timestep), MAX_SUBSTEPS);
 
-      // CPG controller runs every physics step
-      if (activeController === 'cpg' && cpgController) {
-        cpgController.step();
-      }
+      for (let s = 0; s < nsteps; s++) {
+        // CPG: set torques BEFORE physics integration
+        if (activeController === 'cpg' && cpgController) {
+          cpgController.step();
+        }
 
-      // ONNX controller runs at decimation boundary
-      if (activeController === 'onnx' && onnxController && onnxController.enabled) {
-        onnxController.stepCounter = stepCounter;
-        if (stepCounter % onnxController.decimation === 0) {
-          onnxController.runPolicyAsync();
+        // Physics step
+        mujoco.mj_step(model, data);
+        stepCounter++;
+
+        // ONNX: run policy AFTER physics step at decimation boundary
+        if (activeController === 'onnx' && onnxController && onnxController.enabled) {
+          onnxController.stepCounter = stepCounter;
+          if (stepCounter % onnxController.decimation === 0) {
+            onnxController.runPolicyAsync();
+          }
         }
       }
 

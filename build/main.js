@@ -28796,7 +28796,7 @@ var CpgController = class {
     };
     this.jntIdx = {};
     this.findJointIndices();
-    this.forwardSpeed = 0.5;
+    this.forwardSpeed = 0;
     this.lateralSpeed = 0;
     this.turnRate = 0;
     this.prevPitch = 0;
@@ -29139,18 +29139,15 @@ function handleKeyboard() {
     onnxController.setCommand(linX, linY, angZ);
   }
   if (activeController === "cpg" && cpgController && cpgController.enabled) {
-    let fwd = 0.5;
+    let fwd = 0;
     let lat = 0;
     let turn = 0;
-    if (keys["KeyW"] || keys["ArrowUp"]) fwd = 1;
-    if (keys["KeyS"] || keys["ArrowDown"]) fwd = -0.5;
+    if (keys["KeyW"] || keys["ArrowUp"]) fwd = 0.8;
+    if (keys["KeyS"] || keys["ArrowDown"]) fwd = -0.4;
     if (keys["KeyA"] || keys["ArrowLeft"]) lat = 0.3;
     if (keys["KeyD"] || keys["ArrowRight"]) lat = -0.3;
     if (keys["KeyQ"]) turn = 0.5;
     if (keys["KeyE"]) turn = -0.5;
-    if (!keys["KeyW"] && !keys["ArrowUp"] && !keys["KeyS"] && !keys["ArrowDown"]) {
-      fwd = 0;
-    }
     cpgController.setCommand(fwd, lat, turn);
   }
 }
@@ -29227,19 +29224,25 @@ function followCamera() {
     console.error(e);
     return;
   }
+  const MAX_SUBSTEPS = 20;
   function animate() {
     requestAnimationFrame(animate);
     if (model && data && !paused) {
       handleKeyboard();
-      mujoco.mj_step(model, data);
-      stepCounter++;
-      if (activeController === "cpg" && cpgController) {
-        cpgController.step();
-      }
-      if (activeController === "onnx" && onnxController && onnxController.enabled) {
-        onnxController.stepCounter = stepCounter;
-        if (stepCounter % onnxController.decimation === 0) {
-          onnxController.runPolicyAsync();
+      const timestep = model.opt.timestep;
+      const frameDt = 1 / 60;
+      const nsteps = Math.min(Math.round(frameDt / timestep), MAX_SUBSTEPS);
+      for (let s = 0; s < nsteps; s++) {
+        if (activeController === "cpg" && cpgController) {
+          cpgController.step();
+        }
+        mujoco.mj_step(model, data);
+        stepCounter++;
+        if (activeController === "onnx" && onnxController && onnxController.enabled) {
+          onnxController.stepCounter = stepCounter;
+          if (stepCounter % onnxController.decimation === 0) {
+            onnxController.runPolicyAsync();
+          }
         }
       }
       updateBodies();
