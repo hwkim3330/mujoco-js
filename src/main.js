@@ -56,6 +56,13 @@ let cameraFollow = true;
 // Keyboard state
 const keys = {};
 
+// Touch / joystick state
+let touchX = 0; // -1..1 (left/right)
+let touchY = 0; // -1..1 (back/forward)
+let touchRotL = false;
+let touchRotR = false;
+const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
 // Step counter for ONNX decimation
 let stepCounter = 0;
 
@@ -75,7 +82,7 @@ const SCENES = {
   },
 };
 
-let currentScenePath = 'unitree_h1/scene.xml';
+let currentScenePath = 'openduck/scene_flat_terrain_backlash.xml';
 
 // ─── Functions ──────────────────────────────────────────────────────
 function setStatus(text) {
@@ -222,18 +229,35 @@ function toggleController() {
 }
 
 // ─── Keyboard ───────────────────────────────────────────────────────
-function handleKeyboard() {
+function handleInput() {
+  // Merge keyboard + touch input
+  const kbFwd = keys['KeyW'] || keys['ArrowUp'];
+  const kbBack = keys['KeyS'] || keys['ArrowDown'];
+  const kbLeft = keys['KeyA'] || keys['ArrowLeft'];
+  const kbRight = keys['KeyD'] || keys['ArrowRight'];
+  const kbRotL = keys['KeyQ'];
+  const kbRotR = keys['KeyE'];
+
   if (activeController === 'onnx' && onnxController && onnxController.enabled) {
     let linX = onnxController.defaultForwardCommand;
     let linY = 0;
     let angZ = 0;
 
-    if (keys['KeyW'] || keys['ArrowUp']) linX = 0.10;
-    if (keys['KeyS'] || keys['ArrowDown']) linX = -0.10;
-    if (keys['KeyA'] || keys['ArrowLeft']) linY = 0.15;
-    if (keys['KeyD'] || keys['ArrowRight']) linY = -0.15;
-    if (keys['KeyQ']) angZ = 0.5;
-    if (keys['KeyE']) angZ = -0.5;
+    // Keyboard
+    if (kbFwd) linX = 0.10;
+    if (kbBack) linX = -0.10;
+    if (kbLeft) linY = 0.15;
+    if (kbRight) linY = -0.15;
+    if (kbRotL) angZ = 0.5;
+    if (kbRotR) angZ = -0.5;
+
+    // Touch joystick override (if active)
+    if (Math.abs(touchY) > 0.15 || Math.abs(touchX) > 0.15) {
+      linX = touchY * 0.12;  // Forward/back
+      linY = -touchX * 0.18; // Left/right (inverted for duck)
+    }
+    if (touchRotL) angZ = 0.5;
+    if (touchRotR) angZ = -0.5;
 
     onnxController.setCommand(linX, linY, angZ);
   }
@@ -243,12 +267,21 @@ function handleKeyboard() {
     let lat = 0;
     let turn = 0;
 
-    if (keys['KeyW'] || keys['ArrowUp']) fwd = 0.8;
-    if (keys['KeyS'] || keys['ArrowDown']) fwd = -0.4;
-    if (keys['KeyA'] || keys['ArrowLeft']) lat = 0.3;
-    if (keys['KeyD'] || keys['ArrowRight']) lat = -0.3;
-    if (keys['KeyQ']) turn = 0.5;
-    if (keys['KeyE']) turn = -0.5;
+    // Keyboard
+    if (kbFwd) fwd = 0.8;
+    if (kbBack) fwd = -0.4;
+    if (kbLeft) lat = 0.3;
+    if (kbRight) lat = -0.3;
+    if (kbRotL) turn = 0.5;
+    if (kbRotR) turn = -0.5;
+
+    // Touch joystick override
+    if (Math.abs(touchY) > 0.15 || Math.abs(touchX) > 0.15) {
+      fwd = touchY * 0.8;
+      lat = -touchX * 0.3;
+    }
+    if (touchRotL) turn = 0.5;
+    if (touchRotR) turn = -0.5;
 
     cpgController.setCommand(fwd, lat, turn);
   }
@@ -328,6 +361,115 @@ function followCamera() {
   controls.target.lerp(new THREE.Vector3(x, z, -y), 0.05);
 }
 
+// ─── Mobile Touch Controls ──────────────────────────────────────────
+function setupTouch() {
+  if (!isTouchDevice) return;
+
+  const joystickZone = document.getElementById('joystick-zone');
+  const joystickBase = document.getElementById('joystick-base');
+  const joystickThumb = document.getElementById('joystick-thumb');
+  const mobileBtns = document.getElementById('mobile-btns');
+  const rotateZone = document.getElementById('rotate-zone');
+  const helpOverlayEl = document.getElementById('help-overlay');
+
+  // Show mobile UI, hide desktop help
+  if (joystickZone) joystickZone.style.display = 'block';
+  if (mobileBtns) mobileBtns.style.display = 'flex';
+  if (rotateZone) rotateZone.style.display = 'flex';
+  if (helpOverlayEl) helpOverlayEl.style.display = 'none';
+
+  // Virtual joystick
+  if (joystickBase && joystickThumb) {
+    const baseRadius = 70; // half of 140px
+    const maxDist = 45;    // max thumb travel
+
+    let joystickActive = false;
+
+    const updateThumb = (clientX, clientY) => {
+      const rect = joystickBase.getBoundingClientRect();
+      const cx = rect.left + baseRadius;
+      const cy = rect.top + baseRadius;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > maxDist) {
+        dx = (dx / dist) * maxDist;
+        dy = (dy / dist) * maxDist;
+      }
+      joystickThumb.style.left = (baseRadius - 25 + dx) + 'px';
+      joystickThumb.style.top = (baseRadius - 25 + dy) + 'px';
+
+      // Normalize to -1..1
+      touchX = dx / maxDist;
+      touchY = -dy / maxDist; // Y up = forward
+    };
+
+    const resetThumb = () => {
+      joystickThumb.style.left = '45px';
+      joystickThumb.style.top = '45px';
+      touchX = 0;
+      touchY = 0;
+      joystickActive = false;
+    };
+
+    joystickZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      joystickActive = true;
+      const t = e.touches[0];
+      updateThumb(t.clientX, t.clientY);
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!joystickActive) return;
+      const t = e.touches[0];
+      updateThumb(t.clientX, t.clientY);
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      resetThumb();
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchcancel', (e) => {
+      resetThumb();
+    });
+  }
+
+  // Rotation buttons
+  if (rotateZone) {
+    rotateZone.querySelectorAll('.rot-btn').forEach(btn => {
+      const action = btn.dataset.action;
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (action === 'rotL') touchRotL = true;
+        if (action === 'rotR') touchRotR = true;
+      }, { passive: false });
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (action === 'rotL') touchRotL = false;
+        if (action === 'rotR') touchRotR = false;
+      }, { passive: false });
+      btn.addEventListener('touchcancel', () => {
+        touchRotL = false;
+        touchRotR = false;
+      });
+    });
+  }
+
+  // Action buttons
+  if (mobileBtns) {
+    mobileBtns.querySelectorAll('.mobile-btn').forEach(btn => {
+      const action = btn.dataset.action;
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (action === 'reset') resetScene();
+        if (action === 'toggle') toggleController();
+      }, { passive: false });
+    });
+  }
+}
+
 // ─── Boot ───────────────────────────────────────────────────────────
 (async () => {
   try {
@@ -339,8 +481,9 @@ function followCamera() {
       mujoco.FS.mkdir('/working');
     }
 
-    // Default scene: Unitree H1
-    await loadScene('unitree_h1/scene.xml');
+    // Default scene: OpenDuck Backlash (best ONNX walking)
+    await loadScene('openduck/scene_flat_terrain_backlash.xml');
+    setupTouch();
   } catch (e) {
     setStatus('Boot failed');
     console.error(e);
@@ -353,7 +496,7 @@ function followCamera() {
 
   async function animate() {
     if (model && data && !paused) {
-      handleKeyboard();
+      handleInput();
 
       const timestep = model.opt.timestep;
       const frameDt = 1.0 / 60.0;
