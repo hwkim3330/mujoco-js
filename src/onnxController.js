@@ -291,14 +291,13 @@ export class OnnxController {
 
     this.policyStepCount++;
 
-    // Startup assist: blend neck pitch
+    // Startup assist: blend neck pitch (only during first 0.8s, then user controls freely)
     const simTime = this.stepCounter * this.simDt;
-    let neckTarget = this.defaultNeckPitchCommand;
     if (simTime < this.startupAssistDuration) {
       const a = simTime / this.startupAssistDuration;
-      neckTarget = this.startupNeckPitchCommand * (1 - a) + this.defaultNeckPitchCommand * a;
+      const neckTarget = this.startupNeckPitchCommand * (1 - a) + this.defaultNeckPitchCommand * a;
+      this.commands[3] = Math.max(this.commands[3], neckTarget);
     }
-    this.commands[3] = Math.max(this.defaultNeckPitchCommand, Math.min(0.8, Math.max(this.commands[3], neckTarget)));
 
     // 1. Update imitation phase
     this.imitationI = (this.imitationI + 1) % this.nbStepsInPeriod;

@@ -62,6 +62,21 @@
       .mb-sm { width: 44px; height: 44px; font-size: 16px; }
       .mb-row { display: flex; gap: 10px; }
 
+      /* Head control joystick (mobile) */
+      #head-joystick { touch-action: none; }
+      #head-jbase {
+        width: 70px; height: 70px; border-radius: 50%;
+        background: rgba(255,255,255,0.06); border: 2px solid rgba(255,200,100,0.25);
+        position: relative;
+      }
+      #head-jthumb {
+        width: 30px; height: 30px; border-radius: 50%;
+        background: rgba(255,200,100,0.4); border: 2px solid rgba(255,200,100,0.6);
+        position: absolute; top: 20px; left: 20px;
+        pointer-events: none;
+      }
+      #head-joystick .label { font-size: 9px; color: #666; text-align: center; margin-top: 2px; }
+
       @media (max-width: 768px) {
         #help-overlay { display: none; }
         #ui { top: 6px; left: 6px; padding: 5px 8px; gap: 4px; }
@@ -97,6 +112,7 @@
       <div class="title">Controls</div>
       <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move<br>
       <kbd>Q</kbd><kbd>E</kbd> Rotate<br>
+      <kbd>1</kbd><kbd>2</kbd> Head up/down<br>
       <kbd>P</kbd> Toggle controller<br>
       <kbd>R</kbd> Reset pose<br>
       <kbd>F</kbd> Spawn obstacle<br>
@@ -112,9 +128,12 @@
       </div>
     </div>
 
-    <!-- Mobile: Right-side buttons (bottom→top: rotation, spawn, toggle) -->
+    <!-- Mobile: Right-side (bottom→top: rotation, spawn, head joystick) -->
     <div id="mobile-panel">
-      <div class="mb mb-lg" data-action="toggle">P</div>
+      <div id="head-joystick">
+        <div id="head-jbase"><div id="head-jthumb"></div></div>
+        <div class="label">HEAD</div>
+      </div>
       <div class="mb-row">
         <div class="mb mb-sm" data-action="ball" style="color:#f55">&#x25CF;</div>
         <div class="mb mb-sm" data-action="box" style="color:#59f">&#x25A0;</div>

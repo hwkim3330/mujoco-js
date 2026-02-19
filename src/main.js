@@ -21,31 +21,17 @@ const helpOverlay = document.getElementById('help-overlay');
 // ─── Three.js Setup ─────────────────────────────────────────────────
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x1a1e28);
-scene.add(new THREE.HemisphereLight(0xc8d8f0, 0x2a3040, 1.2));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
-dirLight.position.set(3, 8, 4);
+scene.background = new THREE.Color(0x11151d);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.0));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(3, 5, 3);
 dirLight.castShadow = true;
-dirLight.shadow.mapSize.set(2048, 2048);
-dirLight.shadow.camera.near = 0.5;
-dirLight.shadow.camera.far = 30;
-dirLight.shadow.camera.left = -5;
-dirLight.shadow.camera.right = 5;
-dirLight.shadow.camera.top = 5;
-dirLight.shadow.camera.bottom = -5;
-dirLight.shadow.bias = -0.0005;
 scene.add(dirLight);
-scene.add(dirLight.target);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
 camera.position.set(3.0, 2.0, 3.0);
@@ -75,6 +61,8 @@ let touchX = 0; // -1..1 (left/right)
 let touchY = 0; // -1..1 (back/forward)
 let touchRotL = false;
 let touchRotR = false;
+let headX = 0;
+let headY = 0;
 const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
 // Step counter for ONNX decimation
@@ -221,7 +209,7 @@ async function loadScene(scenePath) {
   await loadSceneAssets(mujoco, scenePath, setStatus);
 
   // Generate arena XML with obstacles
-  currentObstacleScale = scenePath.includes('unitree') ? 3.5 : 1;
+  currentObstacleScale = scenePath.includes('unitree') ? 3.5 : 2.5;
   const originalXml = new TextDecoder().decode(mujoco.FS.readFile('/working/' + scenePath));
   const arenaXml = generateArenaXML(originalXml, currentObstacleScale);
   const arenaPath = scenePath.replace('.xml', '_arena.xml');
@@ -389,6 +377,16 @@ function handleInput() {
     if (touchRotR) angZ = -0.5;
 
     onnxController.setCommand(linX, linY, angZ);
+
+    // Head control (joystick or keyboard 1/2)
+    let neckPitch = onnxController.defaultNeckPitchCommand;
+    let headYaw = 0;
+    if (keys['Digit1']) neckPitch = 0.5;
+    if (keys['Digit2']) neckPitch = -0.2;
+    if (Math.abs(headY) > 0.1) neckPitch = headY * 0.5;
+    if (Math.abs(headX) > 0.1) headYaw = -headX * 0.8;
+    onnxController.commands[3] = neckPitch;
+    onnxController.commands[5] = headYaw;
   }
 
   if (activeController === 'cpg' && cpgController && cpgController.enabled) {
@@ -561,6 +559,61 @@ function setupTouch() {
     joystickZone.addEventListener('touchcancel', resetThumb);
   }
 
+  // Head control joystick (right panel, orange)
+  const headJoystick = document.getElementById('head-joystick');
+  const headJBase = document.getElementById('head-jbase');
+  const headJThumb = document.getElementById('head-jthumb');
+
+  if (headJoystick && headJBase && headJThumb) {
+    const hR = 35, hT = 15, hMax = 25;
+    let headTid = null;
+
+    const updateHead = (x, y) => {
+      const r = headJBase.getBoundingClientRect();
+      let dx = x - (r.left + hR), dy = y - (r.top + hR);
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > hMax) { dx *= hMax / d; dy *= hMax / d; }
+      headJThumb.style.left = (hR - hT + dx) + 'px';
+      headJThumb.style.top = (hR - hT + dy) + 'px';
+      headX = dx / hMax;
+      headY = -dy / hMax;
+    };
+
+    const resetHead = () => {
+      headJThumb.style.left = (hR - hT) + 'px';
+      headJThumb.style.top = (hR - hT) + 'px';
+      headX = 0; headY = 0; headTid = null;
+    };
+
+    const findTouch = (touches, id) => {
+      for (let i = 0; i < touches.length; i++) {
+        if (touches[i].identifier === id) return touches[i];
+      }
+      return null;
+    };
+
+    headJoystick.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      headTid = t.identifier;
+      updateHead(t.clientX, t.clientY);
+    }, { passive: false });
+
+    headJoystick.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (headTid === null) return;
+      const t = findTouch(e.touches, headTid);
+      if (t) updateHead(t.clientX, t.clientY);
+    }, { passive: false });
+
+    headJoystick.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (headTid !== null && findTouch(e.changedTouches, headTid)) resetHead();
+    }, { passive: false });
+
+    headJoystick.addEventListener('touchcancel', resetHead);
+  }
+
   // All buttons in the right panel (unified: rotation + actions)
   if (mobilePanel) {
     mobilePanel.querySelectorAll('[data-action]').forEach(btn => {
@@ -651,10 +704,6 @@ function setupTouch() {
 
       updateBodies();
       followCamera();
-
-      // Shadow follows camera target
-      dirLight.position.set(controls.target.x + 3, controls.target.y + 8, controls.target.z + 4);
-      dirLight.target.position.copy(controls.target);
     }
 
     controls.update();
