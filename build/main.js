@@ -11405,9 +11405,9 @@ var Mesh = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys = Object.keys(morphAttributes);
-    if (keys.length > 0) {
-      const morphAttribute = morphAttributes[keys[0]];
+    const keys2 = Object.keys(morphAttributes);
+    if (keys2.length > 0) {
+      const morphAttribute = morphAttributes[keys2[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -13789,6 +13789,206 @@ var MeshStandardMaterial = class extends Material {
     this.wireframeLinejoin = source.wireframeLinejoin;
     this.flatShading = source.flatShading;
     this.fog = source.fog;
+    return this;
+  }
+};
+var MeshPhysicalMaterial = class extends MeshStandardMaterial {
+  /**
+   * Constructs a new mesh physical material.
+   *
+   * @param {Object} [parameters] - An object with one or more properties
+   * defining the material's appearance. Any property of the material
+   * (including any property from inherited materials) can be passed
+   * in here. Color values can be passed any type of value accepted
+   * by {@link Color#set}.
+   */
+  constructor(parameters) {
+    super();
+    this.isMeshPhysicalMaterial = true;
+    this.defines = {
+      "STANDARD": "",
+      "PHYSICAL": ""
+    };
+    this.type = "MeshPhysicalMaterial";
+    this.anisotropyRotation = 0;
+    this.anisotropyMap = null;
+    this.clearcoatMap = null;
+    this.clearcoatRoughness = 0;
+    this.clearcoatRoughnessMap = null;
+    this.clearcoatNormalScale = new Vector2(1, 1);
+    this.clearcoatNormalMap = null;
+    this.ior = 1.5;
+    Object.defineProperty(this, "reflectivity", {
+      get: function() {
+        return clamp(2.5 * (this.ior - 1) / (this.ior + 1), 0, 1);
+      },
+      set: function(reflectivity) {
+        this.ior = (1 + 0.4 * reflectivity) / (1 - 0.4 * reflectivity);
+      }
+    });
+    this.iridescenceMap = null;
+    this.iridescenceIOR = 1.3;
+    this.iridescenceThicknessRange = [100, 400];
+    this.iridescenceThicknessMap = null;
+    this.sheenColor = new Color(0);
+    this.sheenColorMap = null;
+    this.sheenRoughness = 1;
+    this.sheenRoughnessMap = null;
+    this.transmissionMap = null;
+    this.thickness = 0;
+    this.thicknessMap = null;
+    this.attenuationDistance = Infinity;
+    this.attenuationColor = new Color(1, 1, 1);
+    this.specularIntensity = 1;
+    this.specularIntensityMap = null;
+    this.specularColor = new Color(1, 1, 1);
+    this.specularColorMap = null;
+    this._anisotropy = 0;
+    this._clearcoat = 0;
+    this._dispersion = 0;
+    this._iridescence = 0;
+    this._sheen = 0;
+    this._transmission = 0;
+    this.setValues(parameters);
+  }
+  /**
+   * The anisotropy strength, from `0.0` to `1.0`.
+   *
+   * @type {number}
+   * @default 0
+   */
+  get anisotropy() {
+    return this._anisotropy;
+  }
+  set anisotropy(value) {
+    if (this._anisotropy > 0 !== value > 0) {
+      this.version++;
+    }
+    this._anisotropy = value;
+  }
+  /**
+   * Represents the intensity of the clear coat layer, from `0.0` to `1.0`. Use
+   * clear coat related properties to enable multilayer materials that have a
+   * thin translucent layer over the base layer.
+   *
+   * @type {number}
+   * @default 0
+   */
+  get clearcoat() {
+    return this._clearcoat;
+  }
+  set clearcoat(value) {
+    if (this._clearcoat > 0 !== value > 0) {
+      this.version++;
+    }
+    this._clearcoat = value;
+  }
+  /**
+   * The intensity of the iridescence layer, simulating RGB color shift based on the angle between
+   * the surface and the viewer, from `0.0` to `1.0`.
+   *
+   * @type {number}
+   * @default 0
+   */
+  get iridescence() {
+    return this._iridescence;
+  }
+  set iridescence(value) {
+    if (this._iridescence > 0 !== value > 0) {
+      this.version++;
+    }
+    this._iridescence = value;
+  }
+  /**
+   * Defines the strength of the angular separation of colors (chromatic aberration) transmitting
+   * through a relatively clear volume. Any value zero or larger is valid, the typical range of
+   * realistic values is `[0, 1]`. This property can be only be used with transmissive objects.
+   *
+   * @type {number}
+   * @default 0
+   */
+  get dispersion() {
+    return this._dispersion;
+  }
+  set dispersion(value) {
+    if (this._dispersion > 0 !== value > 0) {
+      this.version++;
+    }
+    this._dispersion = value;
+  }
+  /**
+   * The intensity of the sheen layer, from `0.0` to `1.0`.
+   *
+   * @type {number}
+   * @default 0
+   */
+  get sheen() {
+    return this._sheen;
+  }
+  set sheen(value) {
+    if (this._sheen > 0 !== value > 0) {
+      this.version++;
+    }
+    this._sheen = value;
+  }
+  /**
+   * Degree of transmission (or optical transparency), from `0.0` to `1.0`.
+   *
+   * Thin, transparent or semitransparent, plastic or glass materials remain
+   * largely reflective even if they are fully transmissive. The transmission
+   * property can be used to model these materials.
+   *
+   * When transmission is non-zero, `opacity` should be  set to `1`.
+   *
+   * @type {number}
+   * @default 0
+   */
+  get transmission() {
+    return this._transmission;
+  }
+  set transmission(value) {
+    if (this._transmission > 0 !== value > 0) {
+      this.version++;
+    }
+    this._transmission = value;
+  }
+  copy(source) {
+    super.copy(source);
+    this.defines = {
+      "STANDARD": "",
+      "PHYSICAL": ""
+    };
+    this.anisotropy = source.anisotropy;
+    this.anisotropyRotation = source.anisotropyRotation;
+    this.anisotropyMap = source.anisotropyMap;
+    this.clearcoat = source.clearcoat;
+    this.clearcoatMap = source.clearcoatMap;
+    this.clearcoatRoughness = source.clearcoatRoughness;
+    this.clearcoatRoughnessMap = source.clearcoatRoughnessMap;
+    this.clearcoatNormalMap = source.clearcoatNormalMap;
+    this.clearcoatNormalScale.copy(source.clearcoatNormalScale);
+    this.dispersion = source.dispersion;
+    this.ior = source.ior;
+    this.iridescence = source.iridescence;
+    this.iridescenceMap = source.iridescenceMap;
+    this.iridescenceIOR = source.iridescenceIOR;
+    this.iridescenceThicknessRange = [...source.iridescenceThicknessRange];
+    this.iridescenceThicknessMap = source.iridescenceThicknessMap;
+    this.sheen = source.sheen;
+    this.sheenColor.copy(source.sheenColor);
+    this.sheenColorMap = source.sheenColorMap;
+    this.sheenRoughness = source.sheenRoughness;
+    this.sheenRoughnessMap = source.sheenRoughnessMap;
+    this.transmission = source.transmission;
+    this.transmissionMap = source.transmissionMap;
+    this.thickness = source.thickness;
+    this.thicknessMap = source.thicknessMap;
+    this.attenuationDistance = source.attenuationDistance;
+    this.attenuationColor.copy(source.attenuationColor);
+    this.specularIntensity = source.specularIntensity;
+    this.specularIntensityMap = source.specularIntensityMap;
+    this.specularColor.copy(source.specularColor);
+    this.specularColorMap = source.specularColorMap;
     return this;
   }
 };
@@ -27850,20 +28050,946 @@ function interceptControlUp(event) {
 
 // src/main.js
 import load_mujoco from "https://cdn.jsdelivr.net/npm/mujoco-js@0.0.7/dist/mujoco_wasm.js";
+
+// src/meshBuilder.js
+function getPosition(buffer, index, target) {
+  return target.set(
+    buffer[index * 3 + 0],
+    buffer[index * 3 + 2],
+    -buffer[index * 3 + 1]
+  );
+}
+function getQuaternion(buffer, index, target) {
+  return target.set(
+    -buffer[index * 4 + 1],
+    -buffer[index * 4 + 3],
+    buffer[index * 4 + 2],
+    -buffer[index * 4 + 0]
+  );
+}
+function buildScene(model2) {
+  const textDecoder = new TextDecoder("utf-8");
+  const namesArray = new Uint8Array(model2.names);
+  const mujocoRoot2 = new Group();
+  mujocoRoot2.name = "MuJoCo Root";
+  const bodies2 = {};
+  const meshCache = {};
+  for (let g = 0; g < model2.ngeom; g++) {
+    if (!(model2.geom_group[g] < 3)) continue;
+    const b = model2.geom_bodyid[g];
+    const type = model2.geom_type[g];
+    const size = [
+      model2.geom_size[g * 3 + 0],
+      model2.geom_size[g * 3 + 1],
+      model2.geom_size[g * 3 + 2]
+    ];
+    if (!(b in bodies2)) {
+      bodies2[b] = new Group();
+      const start = model2.name_bodyadr[b];
+      let end = start;
+      while (end < namesArray.length && namesArray[end] !== 0) end++;
+      bodies2[b].name = textDecoder.decode(namesArray.subarray(start, end));
+      bodies2[b].bodyID = b;
+    }
+    let geometry;
+    if (type === 0) {
+      geometry = new PlaneGeometry(100, 100);
+    } else if (type === 2) {
+      geometry = new SphereGeometry(size[0], 20, 16);
+    } else if (type === 3) {
+      geometry = new CapsuleGeometry(size[0], size[1] * 2, 12, 16);
+    } else if (type === 4) {
+      geometry = new SphereGeometry(1, 20, 16);
+    } else if (type === 5) {
+      geometry = new CylinderGeometry(size[0], size[0], size[1] * 2, 20);
+    } else if (type === 6) {
+      geometry = new BoxGeometry(size[0] * 2, size[2] * 2, size[1] * 2);
+    } else if (type === 7) {
+      const meshID = model2.geom_dataid[g];
+      if (meshID in meshCache) {
+        geometry = meshCache[meshID];
+      } else {
+        geometry = buildMeshGeometry(model2, meshID);
+        meshCache[meshID] = geometry;
+      }
+    } else {
+      geometry = new SphereGeometry(Math.max(0.01, size[0] || 0.03), 10, 8);
+    }
+    const material = buildMaterial(model2, g);
+    let mesh;
+    if (type === 0) {
+      mesh = new Mesh(geometry, material);
+      mesh.rotateX(-Math.PI / 2);
+      mesh.receiveShadow = true;
+      mesh.castShadow = false;
+    } else {
+      mesh = new Mesh(geometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
+    mesh.bodyID = b;
+    bodies2[b].add(mesh);
+    getPosition(model2.geom_pos, g, mesh.position);
+    if (type !== 0) {
+      getQuaternion(model2.geom_quat, g, mesh.quaternion);
+    }
+    if (type === 4) {
+      mesh.scale.set(size[0], size[2], size[1]);
+    }
+  }
+  for (let b = 0; b < model2.nbody; b++) {
+    if (!bodies2[b]) {
+      bodies2[b] = new Group();
+      bodies2[b].bodyID = b;
+      bodies2[b].name = `body_${b}`;
+    }
+    if (b === 0) {
+      mujocoRoot2.add(bodies2[b]);
+    } else {
+      (bodies2[0] || mujocoRoot2).add(bodies2[b]);
+    }
+  }
+  return { mujocoRoot: mujocoRoot2, bodies: bodies2 };
+}
+function buildMeshGeometry(model2, meshID) {
+  const geometry = new BufferGeometry();
+  const vertStart = model2.mesh_vertadr[meshID] * 3;
+  const vertCount = model2.mesh_vertnum[meshID] * 3;
+  const vertexBuffer = new Float32Array(model2.mesh_vert.subarray(vertStart, vertStart + vertCount));
+  for (let v = 0; v < vertexBuffer.length; v += 3) {
+    const temp = vertexBuffer[v + 1];
+    vertexBuffer[v + 1] = vertexBuffer[v + 2];
+    vertexBuffer[v + 2] = -temp;
+  }
+  let normalAdr, normalNum;
+  if (model2.mesh_normaladr) {
+    normalAdr = model2.mesh_normaladr[meshID];
+    normalNum = model2.mesh_normalnum[meshID];
+  } else {
+    normalAdr = model2.mesh_vertadr[meshID];
+    normalNum = model2.mesh_vertnum[meshID];
+  }
+  const normalBuffer = new Float32Array(model2.mesh_normal.subarray(normalAdr * 3, (normalAdr + normalNum) * 3));
+  for (let v = 0; v < normalBuffer.length; v += 3) {
+    const temp = normalBuffer[v + 1];
+    normalBuffer[v + 1] = normalBuffer[v + 2];
+    normalBuffer[v + 2] = -temp;
+  }
+  const faceStart = model2.mesh_faceadr[meshID] * 3;
+  const faceCount = model2.mesh_facenum[meshID] * 3;
+  const faceBuffer = model2.mesh_face.subarray(faceStart, faceStart + faceCount);
+  const numVerts = model2.mesh_vertnum[meshID];
+  const swizzledNormals = new Float32Array(numVerts * 3);
+  if (model2.mesh_facenormal) {
+    const faceNormalBuffer = model2.mesh_facenormal.subarray(faceStart, faceStart + faceCount);
+    for (let t = 0; t < faceCount / 3; t++) {
+      const vi0 = faceBuffer[t * 3 + 0];
+      const vi1 = faceBuffer[t * 3 + 1];
+      const vi2 = faceBuffer[t * 3 + 2];
+      const ni0 = faceNormalBuffer[t * 3 + 0];
+      const ni1 = faceNormalBuffer[t * 3 + 1];
+      const ni2 = faceNormalBuffer[t * 3 + 2];
+      for (let c = 0; c < 3; c++) {
+        swizzledNormals[vi0 * 3 + c] = normalBuffer[ni0 * 3 + c];
+        swizzledNormals[vi1 * 3 + c] = normalBuffer[ni1 * 3 + c];
+        swizzledNormals[vi2 * 3 + c] = normalBuffer[ni2 * 3 + c];
+      }
+    }
+  }
+  geometry.setAttribute("position", new BufferAttribute(vertexBuffer, 3));
+  geometry.setAttribute("normal", new BufferAttribute(swizzledNormals, 3));
+  geometry.setIndex(Array.from(faceBuffer));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+function buildMaterial(model2, g) {
+  let color = [
+    model2.geom_rgba[g * 4 + 0],
+    model2.geom_rgba[g * 4 + 1],
+    model2.geom_rgba[g * 4 + 2],
+    model2.geom_rgba[g * 4 + 3]
+  ];
+  let texture = null;
+  if (model2.geom_matid[g] !== -1) {
+    const matId = model2.geom_matid[g];
+    color = [
+      model2.mat_rgba[matId * 4 + 0],
+      model2.mat_rgba[matId * 4 + 1],
+      model2.mat_rgba[matId * 4 + 2],
+      model2.mat_rgba[matId * 4 + 3]
+    ];
+    if (model2.mat_texid) {
+      const mjNTEXROLE = 10;
+      const mjTEXROLE_RGB = 1;
+      let texId = -1;
+      try {
+        texId = model2.mat_texid[matId * mjNTEXROLE + mjTEXROLE_RGB];
+      } catch (e) {
+        try {
+          texId = model2.mat_texid[matId];
+        } catch (e2) {
+        }
+      }
+      if (texId !== void 0 && texId !== -1 && model2.tex_data) {
+        try {
+          const width = model2.tex_width[texId];
+          const height = model2.tex_height[texId];
+          const offset = model2.tex_adr[texId];
+          const channels = model2.tex_nchannel ? model2.tex_nchannel[texId] : 3;
+          const texData = model2.tex_data;
+          const rgbaArray = new Uint8Array(width * height * 4);
+          for (let p = 0; p < width * height; p++) {
+            rgbaArray[p * 4 + 0] = texData[offset + p * channels + 0];
+            rgbaArray[p * 4 + 1] = channels > 1 ? texData[offset + p * channels + 1] : rgbaArray[p * 4];
+            rgbaArray[p * 4 + 2] = channels > 2 ? texData[offset + p * channels + 2] : rgbaArray[p * 4];
+            rgbaArray[p * 4 + 3] = channels > 3 ? texData[offset + p * channels + 3] : 255;
+          }
+          texture = new DataTexture(rgbaArray, width, height, RGBAFormat, UnsignedByteType);
+          if (model2.mat_texrepeat) {
+            texture.repeat.set(
+              model2.mat_texrepeat[matId * 2 + 0],
+              model2.mat_texrepeat[matId * 2 + 1]
+            );
+          }
+          texture.wrapS = RepeatWrapping;
+          texture.wrapT = RepeatWrapping;
+          texture.needsUpdate = true;
+        } catch (e) {
+        }
+      }
+    }
+  }
+  return new MeshPhysicalMaterial({
+    color: new Color(color[0], color[1], color[2]),
+    transparent: color[3] < 1,
+    opacity: color[3],
+    roughness: 0.7,
+    metalness: 0.1,
+    map: texture
+  });
+}
+
+// src/assetLoader.js
+var SCENE_ASSETS = {
+  "humanoid.xml": ["humanoid.xml"],
+  "openduck/scene_flat_terrain.xml": [
+    "openduck/scene_flat_terrain.xml",
+    "openduck/open_duck_mini_v2.xml",
+    "openduck/sensors.xml",
+    "openduck/joints_properties.xml",
+    "openduck/assets/antenna.stl",
+    "openduck/assets/body_back.stl",
+    "openduck/assets/body_front.stl",
+    "openduck/assets/body_middle_bottom.stl",
+    "openduck/assets/body_middle_top.stl",
+    "openduck/assets/foot_bottom_pla.stl",
+    "openduck/assets/foot_bottom_tpu.stl",
+    "openduck/assets/foot_side.stl",
+    "openduck/assets/foot_top.stl",
+    "openduck/assets/head_bot_sheet.stl",
+    "openduck/assets/head_pitch_to_yaw.stl",
+    "openduck/assets/head.stl",
+    "openduck/assets/head_yaw_to_roll.stl",
+    "openduck/assets/hfield.png",
+    "openduck/assets/left_antenna_holder.stl",
+    "openduck/assets/left_cache.stl",
+    "openduck/assets/left_knee_to_ankle_left_sheet.stl",
+    "openduck/assets/left_knee_to_ankle_right_sheet.stl",
+    "openduck/assets/left_roll_to_pitch.stl",
+    "openduck/assets/leg_spacer.stl",
+    "openduck/assets/neck_left_sheet.stl",
+    "openduck/assets/neck_right_sheet.stl",
+    "openduck/assets/right_antenna_holder.stl",
+    "openduck/assets/right_cache.stl",
+    "openduck/assets/right_roll_to_pitch.stl",
+    "openduck/assets/roll_motor_bottom.stl",
+    "openduck/assets/roll_motor_top.stl",
+    "openduck/assets/trunk_bottom.stl",
+    "openduck/assets/trunk_top.stl"
+  ],
+  "openduck/scene_flat_terrain_backlash.xml": [
+    "openduck/scene_flat_terrain_backlash.xml",
+    "openduck/open_duck_mini_v2_backlash.xml",
+    "openduck/sensors.xml",
+    "openduck/joints_properties.xml",
+    "openduck/assets/antenna.stl",
+    "openduck/assets/body_back.stl",
+    "openduck/assets/body_front.stl",
+    "openduck/assets/body_middle_bottom.stl",
+    "openduck/assets/body_middle_top.stl",
+    "openduck/assets/foot_bottom_pla.stl",
+    "openduck/assets/foot_bottom_tpu.stl",
+    "openduck/assets/foot_side.stl",
+    "openduck/assets/foot_top.stl",
+    "openduck/assets/head_bot_sheet.stl",
+    "openduck/assets/head_pitch_to_yaw.stl",
+    "openduck/assets/head.stl",
+    "openduck/assets/head_yaw_to_roll.stl",
+    "openduck/assets/hfield.png",
+    "openduck/assets/left_antenna_holder.stl",
+    "openduck/assets/left_cache.stl",
+    "openduck/assets/left_knee_to_ankle_left_sheet.stl",
+    "openduck/assets/left_knee_to_ankle_right_sheet.stl",
+    "openduck/assets/left_roll_to_pitch.stl",
+    "openduck/assets/leg_spacer.stl",
+    "openduck/assets/neck_left_sheet.stl",
+    "openduck/assets/neck_right_sheet.stl",
+    "openduck/assets/right_antenna_holder.stl",
+    "openduck/assets/right_cache.stl",
+    "openduck/assets/right_roll_to_pitch.stl",
+    "openduck/assets/roll_motor_bottom.stl",
+    "openduck/assets/roll_motor_top.stl",
+    "openduck/assets/trunk_bottom.stl",
+    "openduck/assets/trunk_top.stl"
+  ],
+  "unitree_h1/scene.xml": [
+    "unitree_h1/scene.xml",
+    "unitree_h1/h1.xml",
+    "unitree_h1/assets/pelvis.stl",
+    "unitree_h1/assets/left_hip_yaw_link.stl",
+    "unitree_h1/assets/left_hip_roll_link.stl",
+    "unitree_h1/assets/left_hip_pitch_link.stl",
+    "unitree_h1/assets/left_knee_link.stl",
+    "unitree_h1/assets/left_ankle_link.stl",
+    "unitree_h1/assets/right_hip_yaw_link.stl",
+    "unitree_h1/assets/right_hip_roll_link.stl",
+    "unitree_h1/assets/right_hip_pitch_link.stl",
+    "unitree_h1/assets/right_knee_link.stl",
+    "unitree_h1/assets/right_ankle_link.stl",
+    "unitree_h1/assets/torso_link.stl",
+    "unitree_h1/assets/left_shoulder_pitch_link.stl",
+    "unitree_h1/assets/left_shoulder_roll_link.stl",
+    "unitree_h1/assets/left_shoulder_yaw_link.stl",
+    "unitree_h1/assets/left_elbow_link.stl",
+    "unitree_h1/assets/right_shoulder_pitch_link.stl",
+    "unitree_h1/assets/right_shoulder_roll_link.stl",
+    "unitree_h1/assets/right_shoulder_yaw_link.stl",
+    "unitree_h1/assets/right_elbow_link.stl",
+    "unitree_h1/assets/logo_link.stl"
+  ]
+};
+var loadedFiles = /* @__PURE__ */ new Set();
+async function loadSceneAssets(mujoco2, scenePath, onProgress) {
+  const fileList = SCENE_ASSETS[scenePath];
+  if (!fileList) {
+    console.warn(`No asset manifest for "${scenePath}", loading single file.`);
+    await loadSingleFile(mujoco2, scenePath);
+    return;
+  }
+  const toLoad = fileList.filter((f) => !loadedFiles.has(f));
+  if (toLoad.length === 0) return;
+  if (onProgress) onProgress(`Fetching ${toLoad.length} assets...`);
+  const cacheBust = "?v=" + Date.now();
+  const responses = await Promise.all(
+    toLoad.map((url) => fetch("./assets/scenes/" + url + cacheBust))
+  );
+  for (let i = 0; i < toLoad.length; i++) {
+    const file = toLoad[i];
+    const resp = responses[i];
+    if (!resp.ok) {
+      console.warn(`Failed to fetch ${file}: ${resp.status}`);
+      continue;
+    }
+    ensureDir(mujoco2, "/working/" + file);
+    if (file.endsWith(".stl") || file.endsWith(".png") || file.endsWith(".obj")) {
+      mujoco2.FS.writeFile("/working/" + file, new Uint8Array(await resp.arrayBuffer()));
+    } else {
+      mujoco2.FS.writeFile("/working/" + file, await resp.text());
+    }
+    loadedFiles.add(file);
+  }
+}
+async function loadSingleFile(mujoco2, scenePath) {
+  if (loadedFiles.has(scenePath)) return;
+  const resp = await fetch("./assets/scenes/" + scenePath);
+  if (!resp.ok) throw new Error(`Scene not found: ${scenePath}`);
+  ensureDir(mujoco2, "/working/" + scenePath);
+  mujoco2.FS.writeFile("/working/" + scenePath, await resp.text());
+  loadedFiles.add(scenePath);
+}
+function ensureDir(mujoco2, fullPath) {
+  const dir = fullPath.substring(0, fullPath.lastIndexOf("/"));
+  const parts = dir.split("/").filter(Boolean);
+  let cur = "";
+  for (const p of parts) {
+    cur += "/" + p;
+    if (!mujoco2.FS.analyzePath(cur).exists) {
+      mujoco2.FS.mkdir(cur);
+    }
+  }
+}
+
+// src/onnxController.js
+var OnnxController = class {
+  constructor(mujoco2, model2, data2) {
+    this.mujoco = mujoco2;
+    this.model = model2;
+    this.data = data2;
+    this.session = null;
+    this.enabled = false;
+    this.actionScale = 0.25;
+    this.dofVelScale = 0.05;
+    this.maxMotorVelocity = 5.24;
+    this.simDt = 2e-3;
+    this.decimation = 10;
+    this.ctrlDt = this.simDt * this.decimation;
+    this.numDofs = 14;
+    this.lastAction = null;
+    this.lastLastAction = null;
+    this.lastLastLastAction = null;
+    this.motorTargets = null;
+    this.prevMotorTargets = null;
+    this.defaultActuator = null;
+    this.commands = [0, 0, 0, 0, 0, 0, 0];
+    this.defaultForwardCommand = 0.03;
+    this.defaultNeckPitchCommand = 0;
+    this.startupNeckPitchCommand = 0.05;
+    this.startupAssistDuration = 0.8;
+    this.imitationI = 0;
+    this.nbStepsInPeriod = 27;
+    this.imitationPhase = [0, 0];
+    this.stepCounter = 0;
+    this.policyStepCount = 0;
+    this._policyRunning = false;
+    this.gyroAddr = -1;
+    this.accelAddr = -1;
+    this.leftFootBodyId = -1;
+    this.rightFootBodyId = -1;
+    this.floorBodyId = -1;
+    this.qposIndices = null;
+    this.qvelIndices = null;
+  }
+  async loadModel(url) {
+    try {
+      if (typeof ort === "undefined") {
+        console.warn("ONNX Runtime not loaded.");
+        return false;
+      }
+      this.session = await ort.InferenceSession.create(url);
+      console.log("ONNX model loaded:", url);
+      this.inputName = this.session.inputNames[0];
+      this.outputName = this.session.outputNames[0];
+      this.numDofs = this.model.nu;
+      this.initState();
+      this.findSensorAddresses();
+      this.findBodyIds();
+      this.findJointIndices();
+      return true;
+    } catch (e) {
+      console.error("Failed to load ONNX model:", e);
+      return false;
+    }
+  }
+  initState() {
+    const n = this.numDofs;
+    this.lastAction = new Float32Array(n);
+    this.lastLastAction = new Float32Array(n);
+    this.lastLastLastAction = new Float32Array(n);
+    this.motorTargets = new Float32Array(n);
+    this.prevMotorTargets = new Float32Array(n);
+    this.defaultActuator = new Float32Array(n);
+    if (this.model.nkey > 0 && this.model.key_ctrl) {
+      for (let i = 0; i < n; i++) {
+        this.defaultActuator[i] = this.model.key_ctrl[i] || 0;
+      }
+    } else {
+      const homeCtrl = [
+        2e-3,
+        0.053,
+        -0.63,
+        1.368,
+        -0.784,
+        0,
+        0,
+        0,
+        0,
+        -3e-3,
+        -0.065,
+        0.635,
+        1.379,
+        -0.796
+      ];
+      for (let i = 0; i < n; i++) {
+        this.defaultActuator[i] = homeCtrl[i] || 0;
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      this.motorTargets[i] = this.defaultActuator[i];
+      this.prevMotorTargets[i] = this.defaultActuator[i];
+    }
+    const ctrl = this.data.ctrl;
+    for (let i = 0; i < Math.min(n, ctrl.length); i++) {
+      ctrl[i] = this.motorTargets[i];
+    }
+    this.commands[0] = this.defaultForwardCommand;
+    this.commands[3] = this.startupNeckPitchCommand;
+  }
+  findSensorAddresses() {
+    const nsensor = this.model.nsensor;
+    const names = this.model.names;
+    const getNameAt = (nameAdr) => {
+      if (!names || nameAdr < 0 || nameAdr >= names.length) return "";
+      let name = "";
+      for (let j = nameAdr; j < names.length && names[j] !== 0; j++) {
+        name += String.fromCharCode(names[j]);
+      }
+      return name;
+    };
+    if (names && this.model.name_sensoradr) {
+      for (let i = 0; i < nsensor; i++) {
+        const nameAdr = this.model.name_sensoradr[i];
+        const sensorName = getNameAt(nameAdr);
+        const adr = this.model.sensor_adr[i];
+        if (sensorName === "gyro") this.gyroAddr = adr;
+        if (sensorName === "accelerometer") this.accelAddr = adr;
+      }
+    }
+    if (this.gyroAddr < 0 || this.accelAddr < 0) {
+      for (let i = 0; i < nsensor; i++) {
+        const type = this.model.sensor_type[i];
+        const adr = this.model.sensor_adr[i];
+        if (type === 3 && this.gyroAddr < 0) this.gyroAddr = adr;
+        if (type === 1 && this.accelAddr < 0) this.accelAddr = adr;
+      }
+    }
+    if (this.gyroAddr < 0) this.gyroAddr = 0;
+    if (this.accelAddr < 0) this.accelAddr = 6;
+  }
+  findBodyIds() {
+    try {
+      this.leftFootBodyId = this.mujoco.mj_name2id(this.model, 1, "foot_assembly");
+      this.rightFootBodyId = this.mujoco.mj_name2id(this.model, 1, "foot_assembly_2");
+      this.floorBodyId = this.mujoco.mj_name2id(this.model, 1, "floor");
+    } catch (e) {
+      console.warn("Could not find body IDs for contact detection:", e);
+    }
+  }
+  findJointIndices() {
+    const jointNames = [
+      "left_hip_yaw",
+      "left_hip_roll",
+      "left_hip_pitch",
+      "left_knee",
+      "left_ankle",
+      "neck_pitch",
+      "head_pitch",
+      "head_yaw",
+      "head_roll",
+      "right_hip_yaw",
+      "right_hip_roll",
+      "right_hip_pitch",
+      "right_knee",
+      "right_ankle"
+    ];
+    this.qposIndices = new Int32Array(this.numDofs);
+    this.qvelIndices = new Int32Array(this.numDofs);
+    let success = false;
+    try {
+      if (this.model.jnt_qposadr && this.model.jnt_dofadr) {
+        for (let i = 0; i < this.numDofs; i++) {
+          const jointId = this.mujoco.mj_name2id(this.model, 3, jointNames[i]);
+          if (jointId >= 0) {
+            this.qposIndices[i] = this.model.jnt_qposadr[jointId];
+            this.qvelIndices[i] = this.model.jnt_dofadr[jointId];
+          } else {
+            throw new Error(`Joint "${jointNames[i]}" not found`);
+          }
+        }
+        success = true;
+      }
+    } catch (e) {
+      console.warn("Joint index lookup failed, using fallback:", e);
+    }
+    if (!success) {
+      for (let i = 0; i < this.numDofs; i++) {
+        this.qposIndices[i] = 7 + i;
+        this.qvelIndices[i] = 6 + i;
+      }
+    }
+  }
+  setCommand(linX, linY, angZ) {
+    this.commands[0] = Math.max(-0.15, Math.min(0.15, linX));
+    this.commands[1] = Math.max(-0.2, Math.min(0.2, linY));
+    this.commands[2] = Math.max(-1, Math.min(1, angZ));
+  }
+  getObservation() {
+    const obs = [];
+    const sd = this.data.sensordata;
+    obs.push(sd[this.gyroAddr], sd[this.gyroAddr + 1], sd[this.gyroAddr + 2]);
+    obs.push(sd[this.accelAddr] + 1.3, sd[this.accelAddr + 1], sd[this.accelAddr + 2]);
+    obs.push(...this.commands);
+    for (let i = 0; i < this.numDofs; i++) {
+      obs.push(this.data.qpos[this.qposIndices[i]] - this.defaultActuator[i]);
+    }
+    for (let i = 0; i < this.numDofs; i++) {
+      obs.push(this.data.qvel[this.qvelIndices[i]] * this.dofVelScale);
+    }
+    obs.push(...this.lastAction);
+    obs.push(...this.lastLastAction);
+    obs.push(...this.lastLastLastAction);
+    obs.push(...this.motorTargets);
+    obs.push(...this.getFeetContacts());
+    obs.push(...this.imitationPhase);
+    return new Float32Array(obs);
+  }
+  getFeetContacts() {
+    if (this.leftFootBodyId >= 0 && this.rightFootBodyId >= 0 && this.floorBodyId >= 0) {
+      let leftContact = 0;
+      let rightContact = 0;
+      const ncon = this.data.ncon;
+      for (let i = 0; i < ncon; i++) {
+        try {
+          const contact = this.data.contact.get(i);
+          if (!contact) continue;
+          const body1 = this.model.geom_bodyid[contact.geom1];
+          const body2 = this.model.geom_bodyid[contact.geom2];
+          if (body1 === this.leftFootBodyId && body2 === this.floorBodyId || body1 === this.floorBodyId && body2 === this.leftFootBodyId) {
+            leftContact = 1;
+          }
+          if (body1 === this.rightFootBodyId && body2 === this.floorBodyId || body1 === this.floorBodyId && body2 === this.rightFootBodyId) {
+            rightContact = 1;
+          }
+        } catch (e) {
+          break;
+        }
+      }
+      return [leftContact, rightContact];
+    }
+    const height = this.data.qpos[2] || 0;
+    return height < 0.18 ? [1, 1] : [0, 0];
+  }
+  async runPolicy() {
+    if (!this.session || !this.enabled) return;
+    this.policyStepCount++;
+    const simTime = this.stepCounter * this.simDt;
+    let neckTarget = this.defaultNeckPitchCommand;
+    if (simTime < this.startupAssistDuration) {
+      const a = simTime / this.startupAssistDuration;
+      neckTarget = this.startupNeckPitchCommand * (1 - a) + this.defaultNeckPitchCommand * a;
+    }
+    this.commands[3] = Math.max(this.defaultNeckPitchCommand, Math.min(0.8, Math.max(this.commands[3], neckTarget)));
+    this.imitationI = (this.imitationI + 1) % this.nbStepsInPeriod;
+    const phase = this.imitationI / this.nbStepsInPeriod * 2 * Math.PI;
+    this.imitationPhase[0] = Math.cos(phase);
+    this.imitationPhase[1] = Math.sin(phase);
+    const obs = this.getObservation();
+    if (obs.some((v) => isNaN(v))) return;
+    try {
+      const inputTensor = new ort.Tensor("float32", obs, [1, obs.length]);
+      const feeds = {};
+      feeds[this.inputName] = inputTensor;
+      const results = await this.session.run(feeds);
+      const output = results[this.outputName];
+      if (!output) return;
+      const action = new Float32Array(output.data);
+      this.lastLastLastAction.set(this.lastLastAction);
+      this.lastLastAction.set(this.lastAction);
+      this.lastAction.set(action);
+      for (let i = 0; i < this.numDofs; i++) {
+        this.motorTargets[i] = this.defaultActuator[i] + action[i] * this.actionScale;
+      }
+      for (let i = 0; i < this.numDofs; i++) {
+        const maxChange = this.maxMotorVelocity * this.ctrlDt;
+        const diff = this.motorTargets[i] - this.prevMotorTargets[i];
+        if (Math.abs(diff) > maxChange) {
+          this.motorTargets[i] = this.prevMotorTargets[i] + Math.sign(diff) * maxChange;
+        }
+        this.prevMotorTargets[i] = this.motorTargets[i];
+      }
+      const ctrl = this.data.ctrl;
+      for (let i = 0; i < Math.min(this.numDofs, ctrl.length); i++) {
+        ctrl[i] = this.motorTargets[i];
+      }
+    } catch (e) {
+      console.error("ONNX inference error:", e);
+    }
+  }
+  runPolicyAsync() {
+    if (this._policyRunning) return;
+    this._policyRunning = true;
+    this.runPolicy().then(() => {
+      this._policyRunning = false;
+    }).catch((e) => {
+      console.error("Policy error:", e);
+      this._policyRunning = false;
+    });
+  }
+  reset() {
+    if (this.lastAction) this.lastAction.fill(0);
+    if (this.lastLastAction) this.lastLastAction.fill(0);
+    if (this.lastLastLastAction) this.lastLastLastAction.fill(0);
+    this.imitationI = 0;
+    this.imitationPhase = [0, 0];
+    this.commands = [this.defaultForwardCommand, 0, 0, this.startupNeckPitchCommand, 0, 0, 0];
+    this.stepCounter = 0;
+    this.policyStepCount = 0;
+    if (this.motorTargets && this.defaultActuator) {
+      this.motorTargets.set(this.defaultActuator);
+      this.prevMotorTargets.set(this.defaultActuator);
+      const ctrl = this.data.ctrl;
+      for (let i = 0; i < Math.min(this.numDofs, ctrl.length); i++) {
+        ctrl[i] = this.defaultActuator[i];
+      }
+    }
+    this._policyRunning = false;
+  }
+};
+
+// src/cpgController.js
+var CpgController = class {
+  constructor(mujoco2, model2, data2) {
+    this.mujoco = mujoco2;
+    this.model = model2;
+    this.data = data2;
+    this.enabled = false;
+    this.simDt = model2.opt.timestep || 2e-3;
+    this.frequency = 1.2;
+    this.phase = 0;
+    this.hipPitchAmp = 0.25;
+    this.kneeAmp = 0.35;
+    this.ankleAmp = 0.15;
+    this.hipRollAmp = 0.03;
+    this.armSwingGain = 0.3;
+    this.balanceKp = 50;
+    this.balanceKd = 5;
+    this.homeQpos = {
+      left_hip_yaw: 0,
+      left_hip_roll: 0,
+      left_hip_pitch: -0.4,
+      left_knee: 0.8,
+      left_ankle: -0.4,
+      right_hip_yaw: 0,
+      right_hip_roll: 0,
+      right_hip_pitch: -0.4,
+      right_knee: 0.8,
+      right_ankle: -0.4,
+      torso: 0,
+      left_shoulder_pitch: 0,
+      left_shoulder_roll: 0.2,
+      left_shoulder_yaw: 0,
+      left_elbow: -0.3,
+      right_shoulder_pitch: 0,
+      right_shoulder_roll: -0.2,
+      right_shoulder_yaw: 0,
+      right_elbow: -0.3
+    };
+    this.actIdx = {
+      left_hip_yaw: 0,
+      left_hip_roll: 1,
+      left_hip_pitch: 2,
+      left_knee: 3,
+      left_ankle: 4,
+      right_hip_yaw: 5,
+      right_hip_roll: 6,
+      right_hip_pitch: 7,
+      right_knee: 8,
+      right_ankle: 9,
+      torso: 10,
+      left_shoulder_pitch: 11,
+      left_shoulder_roll: 12,
+      left_shoulder_yaw: 13,
+      left_elbow: 14,
+      right_shoulder_pitch: 15,
+      right_shoulder_roll: 16,
+      right_shoulder_yaw: 17,
+      right_elbow: 18
+    };
+    this.jntIdx = {};
+    this.findJointIndices();
+    this.forwardSpeed = 0.5;
+    this.lateralSpeed = 0;
+    this.turnRate = 0;
+    this.prevPitch = 0;
+    this.prevRoll = 0;
+  }
+  findJointIndices() {
+    const names = Object.keys(this.actIdx);
+    for (const name of names) {
+      try {
+        const jid = this.mujoco.mj_name2id(this.model, 3, name);
+        if (jid >= 0 && this.model.jnt_qposadr) {
+          this.jntIdx[name] = this.model.jnt_qposadr[jid];
+        }
+      } catch (e) {
+      }
+    }
+  }
+  setCommand(forward, lateral, turn) {
+    this.forwardSpeed = Math.max(-1, Math.min(1, forward));
+    this.lateralSpeed = Math.max(-0.5, Math.min(0.5, lateral));
+    this.turnRate = Math.max(-1, Math.min(1, turn));
+  }
+  /**
+   * Extract trunk orientation from qpos quaternion.
+   * Returns { pitch, roll } in radians.
+   */
+  getTrunkOrientation() {
+    const qw = this.data.qpos[3];
+    const qx = this.data.qpos[4];
+    const qy = this.data.qpos[5];
+    const qz = this.data.qpos[6];
+    const sinp = 2 * (qw * qy - qz * qx);
+    const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp) * Math.PI / 2 : Math.asin(sinp);
+    const roll = Math.atan2(2 * (qw * qx + qy * qz), 1 - 2 * (qx * qx + qy * qy));
+    return { pitch, roll };
+  }
+  /**
+   * Compute PD torque for a joint to track a target position.
+   * H1 uses torque actuators, so we compute: tau = kp*(target - q) - kd*qdot
+   */
+  pdTorque(jointName, target, kp, kd) {
+    const idx = this.jntIdx[jointName];
+    if (idx === void 0) return 0;
+    let dofIdx;
+    try {
+      const jid = this.mujoco.mj_name2id(this.model, 3, jointName);
+      dofIdx = this.model.jnt_dofadr[jid];
+    } catch (e) {
+      dofIdx = idx - 7 + 6;
+    }
+    const q = this.data.qpos[idx];
+    const qdot = this.data.qvel[dofIdx] || 0;
+    return kp * (target - q) - kd * qdot;
+  }
+  /**
+   * Step the CPG and compute torques.
+   * Called every physics step.
+   */
+  step() {
+    if (!this.enabled) return;
+    this.phase += 2 * Math.PI * this.frequency * this.simDt;
+    if (this.phase > 2 * Math.PI) this.phase -= 2 * Math.PI;
+    const leftPhase = this.phase;
+    const rightPhase = this.phase + Math.PI;
+    const ampScale = Math.abs(this.forwardSpeed);
+    const direction = Math.sign(this.forwardSpeed) || 1;
+    const { pitch, roll } = this.getTrunkOrientation();
+    const pitchRate = (pitch - this.prevPitch) / this.simDt;
+    const rollRate = (roll - this.prevRoll) / this.simDt;
+    this.prevPitch = pitch;
+    this.prevRoll = roll;
+    const hipKp = 150, hipKd = 8;
+    const kneeKp = 200, kneeKd = 10;
+    const ankleKp = 30, ankleKd = 2;
+    const torsoKp = 150, torsoKd = 10;
+    const armKp = 20, armKd = 2;
+    const ctrl = this.data.ctrl;
+    const leftSwing = Math.sin(leftPhase);
+    const leftStance = Math.max(0, -Math.sin(leftPhase));
+    const leftHipPitchTarget = this.homeQpos.left_hip_pitch + direction * this.hipPitchAmp * ampScale * leftSwing;
+    const leftKneeTarget = this.homeQpos.left_knee + this.kneeAmp * ampScale * Math.max(0, Math.sin(leftPhase));
+    const leftAnkleTarget = this.homeQpos.left_ankle - this.ankleAmp * ampScale * leftSwing;
+    const leftHipRollTarget = this.homeQpos.left_hip_roll - this.hipRollAmp * leftStance + this.lateralSpeed * 0.05;
+    const leftHipYawTarget = this.homeQpos.left_hip_yaw + this.turnRate * 0.05 * leftSwing;
+    ctrl[this.actIdx.left_hip_yaw] = this.pdTorque("left_hip_yaw", leftHipYawTarget, hipKp, hipKd);
+    ctrl[this.actIdx.left_hip_roll] = this.pdTorque("left_hip_roll", leftHipRollTarget, hipKp, hipKd);
+    ctrl[this.actIdx.left_hip_pitch] = this.pdTorque("left_hip_pitch", leftHipPitchTarget, hipKp, hipKd);
+    ctrl[this.actIdx.left_knee] = this.pdTorque("left_knee", leftKneeTarget, kneeKp, kneeKd);
+    ctrl[this.actIdx.left_ankle] = this.pdTorque("left_ankle", leftAnkleTarget, ankleKp, ankleKd);
+    const rightSwing = Math.sin(rightPhase);
+    const rightStance = Math.max(0, -Math.sin(rightPhase));
+    const rightHipPitchTarget = this.homeQpos.right_hip_pitch + direction * this.hipPitchAmp * ampScale * rightSwing;
+    const rightKneeTarget = this.homeQpos.right_knee + this.kneeAmp * ampScale * Math.max(0, Math.sin(rightPhase));
+    const rightAnkleTarget = this.homeQpos.right_ankle - this.ankleAmp * ampScale * rightSwing;
+    const rightHipRollTarget = this.homeQpos.right_hip_roll + this.hipRollAmp * rightStance + this.lateralSpeed * 0.05;
+    const rightHipYawTarget = this.homeQpos.right_hip_yaw + this.turnRate * 0.05 * rightSwing;
+    ctrl[this.actIdx.right_hip_yaw] = this.pdTorque("right_hip_yaw", rightHipYawTarget, hipKp, hipKd);
+    ctrl[this.actIdx.right_hip_roll] = this.pdTorque("right_hip_roll", rightHipRollTarget, hipKp, hipKd);
+    ctrl[this.actIdx.right_hip_pitch] = this.pdTorque("right_hip_pitch", rightHipPitchTarget, hipKp, hipKd);
+    ctrl[this.actIdx.right_knee] = this.pdTorque("right_knee", rightKneeTarget, kneeKp, kneeKd);
+    ctrl[this.actIdx.right_ankle] = this.pdTorque("right_ankle", rightAnkleTarget, ankleKp, ankleKd);
+    const torsoTarget = this.homeQpos.torso + this.turnRate * 0.1;
+    ctrl[this.actIdx.torso] = this.pdTorque("torso", torsoTarget, torsoKp, torsoKd);
+    const pitchCorrection = -this.balanceKp * pitch - this.balanceKd * pitchRate;
+    ctrl[this.actIdx.left_hip_pitch] += pitchCorrection * 0.3;
+    ctrl[this.actIdx.right_hip_pitch] += pitchCorrection * 0.3;
+    const rollCorrection = -this.balanceKp * roll - this.balanceKd * rollRate;
+    ctrl[this.actIdx.left_hip_roll] += rollCorrection * 0.2;
+    ctrl[this.actIdx.right_hip_roll] -= rollCorrection * 0.2;
+    const leftArmSwing = -this.armSwingGain * direction * ampScale * leftSwing;
+    const rightArmSwing = -this.armSwingGain * direction * ampScale * rightSwing;
+    ctrl[this.actIdx.left_shoulder_pitch] = this.pdTorque(
+      "left_shoulder_pitch",
+      this.homeQpos.left_shoulder_pitch + leftArmSwing,
+      armKp,
+      armKd
+    );
+    ctrl[this.actIdx.left_shoulder_roll] = this.pdTorque(
+      "left_shoulder_roll",
+      this.homeQpos.left_shoulder_roll,
+      armKp,
+      armKd
+    );
+    ctrl[this.actIdx.left_shoulder_yaw] = this.pdTorque(
+      "left_shoulder_yaw",
+      this.homeQpos.left_shoulder_yaw,
+      armKp * 0.5,
+      armKd
+    );
+    ctrl[this.actIdx.left_elbow] = this.pdTorque(
+      "left_elbow",
+      this.homeQpos.left_elbow,
+      armKp,
+      armKd
+    );
+    ctrl[this.actIdx.right_shoulder_pitch] = this.pdTorque(
+      "right_shoulder_pitch",
+      this.homeQpos.right_shoulder_pitch + rightArmSwing,
+      armKp,
+      armKd
+    );
+    ctrl[this.actIdx.right_shoulder_roll] = this.pdTorque(
+      "right_shoulder_roll",
+      this.homeQpos.right_shoulder_roll,
+      armKp,
+      armKd
+    );
+    ctrl[this.actIdx.right_shoulder_yaw] = this.pdTorque(
+      "right_shoulder_yaw",
+      this.homeQpos.right_shoulder_yaw,
+      armKp * 0.5,
+      armKd
+    );
+    ctrl[this.actIdx.right_elbow] = this.pdTorque(
+      "right_elbow",
+      this.homeQpos.right_elbow,
+      armKp,
+      armKd
+    );
+    if (this.model.actuator_ctrlrange) {
+      for (let i = 0; i < this.model.nu; i++) {
+        const lo = this.model.actuator_ctrlrange[i * 2];
+        const hi = this.model.actuator_ctrlrange[i * 2 + 1];
+        ctrl[i] = Math.max(lo, Math.min(hi, ctrl[i]));
+      }
+    }
+  }
+  reset() {
+    this.phase = 0;
+    this.prevPitch = 0;
+    this.prevRoll = 0;
+  }
+};
+
+// src/main.js
 var statusEl = document.getElementById("status");
 var sceneSelect = document.getElementById("scene-select");
 var resetBtn = document.getElementById("btn-reset");
+var controllerBtn = document.getElementById("btn-controller");
+var helpOverlay = document.getElementById("help-overlay");
 var app = document.getElementById("app");
 var renderer = new WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 var scene = new Scene();
 scene.background = new Color(1119517);
 scene.add(new HemisphereLight(16777215, 2241348, 1));
-var dir = new DirectionalLight(16777215, 1.2);
-dir.position.set(3, 5, 3);
-scene.add(dir);
-var camera = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+var dirLight = new DirectionalLight(16777215, 1.2);
+dirLight.position.set(3, 5, 3);
+dirLight.castShadow = true;
+scene.add(dirLight);
+var camera = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
 camera.position.set(2, 1.6, 2);
 var controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0.9, 0);
@@ -27871,94 +28997,53 @@ controls.enableDamping = true;
 var mujoco;
 var model;
 var data;
-var geomMeshes = [];
+var bodies = {};
+var mujocoRoot = null;
+var onnxController = null;
+var cpgController = null;
+var activeController = null;
+var paused = false;
+var cameraFollow = true;
+var keys = {};
+var stepCounter = 0;
+var SCENES = {
+  "humanoid.xml": {
+    controller: null,
+    camera: { pos: [2, 1.6, 2], target: [0, 0.9, 0] }
+  },
+  "openduck/scene_flat_terrain.xml": {
+    controller: "onnx",
+    camera: { pos: [0.5, 0.4, 0.5], target: [0, 0.15, 0] }
+  },
+  "unitree_h1/scene.xml": {
+    controller: "cpg",
+    camera: { pos: [3, 2, 3], target: [0, 0.9, 0] }
+  }
+};
+var currentScenePath = "humanoid.xml";
 function setStatus(text) {
   statusEl.textContent = text;
 }
-function clearGeomMeshes() {
-  for (const m of geomMeshes) scene.remove(m);
-  geomMeshes = [];
+function clearScene() {
+  if (mujocoRoot) {
+    scene.remove(mujocoRoot);
+    mujocoRoot = null;
+  }
+  bodies = {};
 }
-function makeGeomMesh(geomType, size) {
-  let geometry;
-  switch (geomType) {
-    case 2:
-      geometry = new SphereGeometry(size[0], 16, 12);
-      break;
-    case 3:
-      geometry = new CapsuleGeometry(size[0], Math.max(1e-3, size[1] * 2), 4, 8);
-      break;
-    case 5:
-      geometry = new CylinderGeometry(size[0], size[0], Math.max(1e-3, size[1] * 2), 12);
-      break;
-    case 6:
-      geometry = new BoxGeometry(Math.max(1e-3, size[0] * 2), Math.max(1e-3, size[1] * 2), Math.max(1e-3, size[2] * 2));
-      break;
-    default:
-      geometry = new SphereGeometry(Math.max(0.01, size[0] || 0.03), 10, 8);
-      break;
+async function loadScene(scenePath) {
+  setStatus(`Loading: ${scenePath}`);
+  await loadSceneAssets(mujoco, scenePath, setStatus);
+  clearScene();
+  if (data) {
+    data.delete();
+    data = null;
   }
-  const material = new MeshStandardMaterial({ color: 7252223, roughness: 0.8, metalness: 0.1 });
-  return new Mesh(geometry, material);
-}
-function rebuildSceneMeshes() {
-  clearGeomMeshes();
-  for (let g = 0; g < model.ngeom; g++) {
-    const adr = g * 3;
-    const size = [model.geom_size[adr + 0], model.geom_size[adr + 1], model.geom_size[adr + 2]];
-    const mesh = makeGeomMesh(model.geom_type[g], size);
-    scene.add(mesh);
-    geomMeshes.push(mesh);
+  if (model) {
+    model.delete();
+    model = null;
   }
-}
-function updateGeomMeshes() {
-  for (let g = 0; g < model.ngeom; g++) {
-    const mesh = geomMeshes[g];
-    const p = g * 3;
-    mesh.position.set(data.geom_xpos[p + 0], data.geom_xpos[p + 1], data.geom_xpos[p + 2]);
-    const r = g * 9;
-    const m = new Matrix4();
-    m.set(
-      data.geom_xmat[r + 0],
-      data.geom_xmat[r + 1],
-      data.geom_xmat[r + 2],
-      0,
-      data.geom_xmat[r + 3],
-      data.geom_xmat[r + 4],
-      data.geom_xmat[r + 5],
-      0,
-      data.geom_xmat[r + 6],
-      data.geom_xmat[r + 7],
-      data.geom_xmat[r + 8],
-      0,
-      0,
-      0,
-      0,
-      1
-    );
-    mesh.quaternion.setFromRotationMatrix(m);
-  }
-}
-async function loadSceneXML(scenePath) {
-  if (!mujoco.FS.analyzePath("/working").exists) mujoco.FS.mkdir("/working");
-  let xml;
-  try {
-    xml = await (await fetch(`./assets/scenes/${scenePath}`)).text();
-  } catch (e) {
-    throw new Error(`scene not found: ${scenePath}`);
-  }
-  const virtualPath = `/working/${scenePath}`;
-  const dir2 = virtualPath.substring(0, virtualPath.lastIndexOf("/"));
-  const parts = dir2.split("/").filter(Boolean);
-  let cur = "";
-  for (const p of parts) {
-    cur += `/${p}`;
-    if (!mujoco.FS.analyzePath(cur).exists) mujoco.FS.mkdir(cur);
-  }
-  mujoco.FS.writeFile(virtualPath, xml);
-  if (data) data.delete();
-  if (model) model.delete();
-  model = mujoco.MjModel.loadFromXML(virtualPath);
+  model = mujoco.MjModel.loadFromXML("/working/" + scenePath);
   data = new mujoco.MjData(model);
   if (model.nkey > 0) {
     data.qpos.set(model.key_qpos.slice(0, model.nq));
@@ -27966,52 +29051,199 @@ async function loadSceneXML(scenePath) {
     if (model.key_ctrl) data.ctrl.set(model.key_ctrl.slice(0, model.nu));
     mujoco.mj_forward(model, data);
   }
-  rebuildSceneMeshes();
-  controls.target.set(0, 0.9, 0);
+  const built = buildScene(model);
+  mujocoRoot = built.mujocoRoot;
+  bodies = built.bodies;
+  scene.add(mujocoRoot);
+  activeController = null;
+  onnxController = null;
+  cpgController = null;
+  stepCounter = 0;
+  const cfg = SCENES[scenePath] || {};
+  if (cfg.controller === "onnx") {
+    model.opt.iterations = 30;
+    onnxController = new OnnxController(mujoco, model, data);
+    const loaded = await onnxController.loadModel("./assets/models/openduck_walk.onnx");
+    if (loaded) {
+      for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+      onnxController.enabled = true;
+      activeController = "onnx";
+      updateControllerBtn();
+    }
+  } else if (cfg.controller === "cpg") {
+    cpgController = new CpgController(mujoco, model, data);
+    for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+    cpgController.enabled = true;
+    activeController = "cpg";
+    updateControllerBtn();
+  }
+  if (cfg.camera) {
+    camera.position.set(...cfg.camera.pos);
+    controls.target.set(...cfg.camera.target);
+  }
   controls.update();
+  currentScenePath = scenePath;
+  setStatus(`Ready: ${scenePath.split("/").pop()}`);
 }
-async function boot() {
-  setStatus("Loading MuJoCo wasm...");
-  mujoco = await load_mujoco();
-  setStatus("Loading scene: humanoid.xml");
-  await loadSceneXML("humanoid.xml");
-  setStatus("Ready");
+function updateControllerBtn() {
+  if (!controllerBtn) return;
+  if (activeController === "onnx") {
+    controllerBtn.textContent = onnxController?.enabled ? "Policy: ON" : "Policy: OFF";
+    controllerBtn.style.display = "";
+  } else if (activeController === "cpg") {
+    controllerBtn.textContent = cpgController?.enabled ? "CPG: ON" : "CPG: OFF";
+    controllerBtn.style.display = "";
+  } else {
+    controllerBtn.style.display = "none";
+  }
 }
-sceneSelect.addEventListener("change", async (e) => {
-  const selected = e.target.value;
-  try {
-    setStatus(`Loading scene: ${selected}`);
-    await loadSceneXML(selected);
-    setStatus(`Ready: ${selected}`);
-  } catch (err) {
-    setStatus(`Failed: ${selected}`);
-    console.warn(err);
+function resetScene() {
+  if (!model || !data) return;
+  if (model.nkey > 0) {
+    data.qpos.set(model.key_qpos.slice(0, model.nq));
+    for (let i = 0; i < model.nv; i++) data.qvel[i] = 0;
+    if (model.key_ctrl) data.ctrl.set(model.key_ctrl.slice(0, model.nu));
+    mujoco.mj_forward(model, data);
+  }
+  for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+  stepCounter = 0;
+  if (onnxController) {
+    onnxController.reset();
+    onnxController.enabled = true;
+  }
+  if (cpgController) {
+    cpgController.reset();
+    cpgController.enabled = true;
+  }
+  updateControllerBtn();
+}
+function toggleController() {
+  if (activeController === "onnx" && onnxController) {
+    onnxController.enabled = !onnxController.enabled;
+  } else if (activeController === "cpg" && cpgController) {
+    cpgController.enabled = !cpgController.enabled;
+  }
+  updateControllerBtn();
+}
+function handleKeyboard() {
+  if (activeController === "onnx" && onnxController && onnxController.enabled) {
+    let linX = onnxController.defaultForwardCommand;
+    let linY = 0;
+    let angZ = 0;
+    if (keys["KeyW"] || keys["ArrowUp"]) linX = 0.1;
+    if (keys["KeyS"] || keys["ArrowDown"]) linX = -0.1;
+    if (keys["KeyA"] || keys["ArrowLeft"]) linY = 0.15;
+    if (keys["KeyD"] || keys["ArrowRight"]) linY = -0.15;
+    if (keys["KeyQ"]) angZ = 0.5;
+    if (keys["KeyE"]) angZ = -0.5;
+    onnxController.setCommand(linX, linY, angZ);
+  }
+  if (activeController === "cpg" && cpgController && cpgController.enabled) {
+    let fwd = 0.5;
+    let lat = 0;
+    let turn = 0;
+    if (keys["KeyW"] || keys["ArrowUp"]) fwd = 1;
+    if (keys["KeyS"] || keys["ArrowDown"]) fwd = -0.5;
+    if (keys["KeyA"] || keys["ArrowLeft"]) lat = 0.3;
+    if (keys["KeyD"] || keys["ArrowRight"]) lat = -0.3;
+    if (keys["KeyQ"]) turn = 0.5;
+    if (keys["KeyE"]) turn = -0.5;
+    if (!keys["KeyW"] && !keys["ArrowUp"] && !keys["KeyS"] && !keys["ArrowDown"]) {
+      fwd = 0;
+    }
+    cpgController.setCommand(fwd, lat, turn);
+  }
+}
+window.addEventListener("keydown", (e) => {
+  keys[e.code] = true;
+  if (e.code === "Space") {
+    paused = !paused;
+    e.preventDefault();
+  }
+  if (e.code === "KeyP") {
+    toggleController();
+  }
+  if (e.code === "KeyR") {
+    resetScene();
+  }
+  if (e.code === "KeyC") {
+    cameraFollow = !cameraFollow;
+  }
+  if (e.code === "KeyH") {
+    if (helpOverlay) helpOverlay.style.display = helpOverlay.style.display === "none" ? "" : "none";
   }
 });
-resetBtn.addEventListener("click", () => {
-  if (!model || !data || model.nkey <= 0) return;
-  data.qpos.set(model.key_qpos.slice(0, model.nq));
-  for (let i = 0; i < model.nv; i++) data.qvel[i] = 0;
-  if (model.key_ctrl) data.ctrl.set(model.key_ctrl.slice(0, model.nu));
-  mujoco.mj_forward(model, data);
+window.addEventListener("keyup", (e) => {
+  keys[e.code] = false;
 });
+sceneSelect.addEventListener("change", async (e) => {
+  try {
+    await loadScene(e.target.value);
+  } catch (err) {
+    setStatus(`Failed: ${e.target.value}`);
+    console.error(err);
+  }
+});
+resetBtn.addEventListener("click", resetScene);
+if (controllerBtn) {
+  controllerBtn.addEventListener("click", toggleController);
+}
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+function updateBodies() {
+  for (const b in bodies) {
+    const body = bodies[b];
+    const idx = parseInt(b);
+    getPosition(data.xpos, idx, body.position);
+    getQuaternion(data.xquat, idx, body.quaternion);
+    body.updateWorldMatrix(false, false);
+  }
+}
+function followCamera() {
+  if (!cameraFollow || !model || !data) return;
+  let rootBody = 1;
+  const x = data.xpos[rootBody * 3 + 0];
+  const y = data.xpos[rootBody * 3 + 1];
+  const z = data.xpos[rootBody * 3 + 2];
+  const tx = x;
+  const ty = z;
+  const tz = -y;
+  controls.target.lerp(new Vector3(tx, ty, tz), 0.05);
+}
 (async () => {
   try {
-    await boot();
+    setStatus("Loading MuJoCo WASM...");
+    mujoco = await load_mujoco();
+    if (!mujoco.FS.analyzePath("/working").exists) {
+      mujoco.FS.mkdir("/working");
+    }
+    await loadScene("humanoid.xml");
+    updateControllerBtn();
   } catch (e) {
     setStatus("Boot failed");
     console.error(e);
+    return;
   }
   function animate() {
     requestAnimationFrame(animate);
-    if (model && data) {
+    if (model && data && !paused) {
+      handleKeyboard();
       mujoco.mj_step(model, data);
-      updateGeomMeshes();
+      stepCounter++;
+      if (activeController === "cpg" && cpgController) {
+        cpgController.step();
+      }
+      if (activeController === "onnx" && onnxController && onnxController.enabled) {
+        onnxController.stepCounter = stepCounter;
+        if (stepCounter % onnxController.decimation === 0) {
+          onnxController.runPolicyAsync();
+        }
+      }
+      updateBodies();
+      followCamera();
     }
     controls.update();
     renderer.render(scene, camera);

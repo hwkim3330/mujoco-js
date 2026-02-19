@@ -6,11 +6,25 @@
     <title>mujoco-js playground</title>
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1115; color: #e7ecf3; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-      #ui { position: fixed; top: 12px; left: 12px; z-index: 10; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; }
-      select, button { background: #171a21; color: #e7ecf3; border: 1px solid #333a48; border-radius: 8px; padding: 8px 10px; }
-      #status { font-size: 12px; color: #b8c2d4; min-width: 220px; }
+      #ui { position: fixed; top: 12px; left: 12px; z-index: 10; display: flex; gap: 8px; align-items: center; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 10px; flex-wrap: wrap; max-width: 600px; }
+      select, button { background: #171a21; color: #e7ecf3; border: 1px solid #333a48; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; }
+      select:hover, button:hover { border-color: #5588cc; }
+      #status { font-size: 12px; color: #b8c2d4; min-width: 160px; }
       #app { width: 100vw; height: 100vh; }
+      #help-overlay {
+        position: fixed; bottom: 12px; right: 12px; z-index: 10;
+        background: rgba(0,0,0,0.65); border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 10px; padding: 14px 18px; font-size: 12px; line-height: 1.8;
+        color: #b8c2d4; max-width: 260px;
+      }
+      #help-overlay kbd {
+        background: #222; border: 1px solid #444; border-radius: 4px;
+        padding: 1px 6px; font-family: monospace; color: #e7ecf3;
+      }
+      #help-overlay .title { font-weight: 600; color: #e7ecf3; margin-bottom: 4px; }
     </style>
+    <!-- ONNX Runtime Web for OpenDuck walking policy -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
     <script type="importmap">
       {
@@ -24,11 +38,26 @@
   <body>
     <div id="ui">
       <select id="scene-select">
-        <option value="humanoid.xml">humanoid.xml</option>
+        <option value="humanoid.xml">Humanoid</option>
+        <option value="openduck/scene_flat_terrain.xml">OpenDuck Mini (ONNX)</option>
+        <option value="unitree_h1/scene.xml">Unitree H1 (CPG)</option>
       </select>
       <button id="btn-reset">Reset</button>
+      <button id="btn-controller" style="display:none">Policy: OFF</button>
       <div id="status">Loading MuJoCo...</div>
     </div>
+
+    <div id="help-overlay">
+      <div class="title">Controls</div>
+      <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move<br>
+      <kbd>Q</kbd><kbd>E</kbd> Rotate<br>
+      <kbd>P</kbd> Toggle controller<br>
+      <kbd>R</kbd> Reset pose<br>
+      <kbd>Space</kbd> Pause<br>
+      <kbd>C</kbd> Camera follow<br>
+      <kbd>H</kbd> Hide this
+    </div>
+
     <div id="app"></div>
     <script type="module" src="./build/main.js"></script>
   </body>

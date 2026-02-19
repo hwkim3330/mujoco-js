@@ -1,120 +1,180 @@
+/**
+ * main.js — MuJoCo WASM + Three.js playground with walking controllers.
+ * Supports: humanoid (physics only), OpenDuck (ONNX), Unitree H1 (CPG).
+ */
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import load_mujoco from 'https://cdn.jsdelivr.net/npm/mujoco-js@0.0.7/dist/mujoco_wasm.js';
+import { buildScene, getPosition, getQuaternion } from './meshBuilder.js';
+import { loadSceneAssets } from './assetLoader.js';
+import { OnnxController } from './onnxController.js';
+import { CpgController } from './cpgController.js';
 
+// ─── DOM ────────────────────────────────────────────────────────────
 const statusEl = document.getElementById('status');
 const sceneSelect = document.getElementById('scene-select');
 const resetBtn = document.getElementById('btn-reset');
+const controllerBtn = document.getElementById('btn-controller');
+const helpOverlay = document.getElementById('help-overlay');
 
+// ─── Three.js Setup ─────────────────────────────────────────────────
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x11151d);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.0));
-const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-dir.position.set(3, 5, 3);
-scene.add(dir);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+dirLight.position.set(3, 5, 3);
+dirLight.castShadow = true;
+scene.add(dirLight);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 100);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
 camera.position.set(2.0, 1.6, 2.0);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0.9, 0);
 controls.enableDamping = true;
 
+// ─── State ──────────────────────────────────────────────────────────
 let mujoco;
 let model;
 let data;
-let geomMeshes = [];
+let bodies = {};
+let mujocoRoot = null;
 
+let onnxController = null;
+let cpgController = null;
+let activeController = null; // 'onnx' | 'cpg' | null
+
+let paused = false;
+let cameraFollow = true;
+
+// Keyboard state
+const keys = {};
+
+// Step counter for ONNX decimation
+let stepCounter = 0;
+
+// ─── Scene Config ───────────────────────────────────────────────────
+const SCENES = {
+  'humanoid.xml': {
+    controller: null,
+    camera: { pos: [2.0, 1.6, 2.0], target: [0, 0.9, 0] },
+  },
+  'openduck/scene_flat_terrain.xml': {
+    controller: 'onnx',
+    camera: { pos: [0.5, 0.4, 0.5], target: [0, 0.15, 0] },
+  },
+  'unitree_h1/scene.xml': {
+    controller: 'cpg',
+    camera: { pos: [3.0, 2.0, 3.0], target: [0, 0.9, 0] },
+  },
+};
+
+let currentScenePath = 'humanoid.xml';
+
+// ─── Functions ──────────────────────────────────────────────────────
 function setStatus(text) {
   statusEl.textContent = text;
 }
 
-function clearGeomMeshes() {
-  for (const m of geomMeshes) scene.remove(m);
-  geomMeshes = [];
+function clearScene() {
+  if (mujocoRoot) {
+    scene.remove(mujocoRoot);
+    mujocoRoot = null;
+  }
+  bodies = {};
 }
 
-function makeGeomMesh(geomType, size) {
-  let geometry;
-  switch (geomType) {
-    case 2: // sphere
-      geometry = new THREE.SphereGeometry(size[0], 16, 12);
-      break;
-    case 3: // capsule (approx with cylinder)
-      geometry = new THREE.CapsuleGeometry(size[0], Math.max(0.001, size[1] * 2.0), 4, 8);
-      break;
-    case 5: // cylinder
-      geometry = new THREE.CylinderGeometry(size[0], size[0], Math.max(0.001, size[1] * 2.0), 12);
-      break;
-    case 6: // box
-      geometry = new THREE.BoxGeometry(Math.max(0.001, size[0] * 2), Math.max(0.001, size[1] * 2), Math.max(0.001, size[2] * 2));
-      break;
-    default:
-      geometry = new THREE.SphereGeometry(Math.max(0.01, size[0] || 0.03), 10, 8);
-      break;
-  }
-  const material = new THREE.MeshStandardMaterial({ color: 0x6ea8ff, roughness: 0.8, metalness: 0.1 });
-  return new THREE.Mesh(geometry, material);
-}
+async function loadScene(scenePath) {
+  setStatus(`Loading: ${scenePath}`);
 
-function rebuildSceneMeshes() {
-  clearGeomMeshes();
-  for (let g = 0; g < model.ngeom; g++) {
-    const adr = g * 3;
-    const size = [model.geom_size[adr + 0], model.geom_size[adr + 1], model.geom_size[adr + 2]];
-    const mesh = makeGeomMesh(model.geom_type[g], size);
-    scene.add(mesh);
-    geomMeshes.push(mesh);
-  }
-}
+  // Load assets to VFS
+  await loadSceneAssets(mujoco, scenePath, setStatus);
 
-function updateGeomMeshes() {
-  for (let g = 0; g < model.ngeom; g++) {
-    const mesh = geomMeshes[g];
-    const p = g * 3;
-    mesh.position.set(data.geom_xpos[p + 0], data.geom_xpos[p + 1], data.geom_xpos[p + 2]);
+  // Clean up old model
+  clearScene();
+  if (data) { data.delete(); data = null; }
+  if (model) { model.delete(); model = null; }
 
-    const r = g * 9;
-    const m = new THREE.Matrix4();
-    m.set(
-      data.geom_xmat[r + 0], data.geom_xmat[r + 1], data.geom_xmat[r + 2], 0,
-      data.geom_xmat[r + 3], data.geom_xmat[r + 4], data.geom_xmat[r + 5], 0,
-      data.geom_xmat[r + 6], data.geom_xmat[r + 7], data.geom_xmat[r + 8], 0,
-      0, 0, 0, 1
-    );
-    mesh.quaternion.setFromRotationMatrix(m);
-  }
-}
-
-async function loadSceneXML(scenePath) {
-  if (!mujoco.FS.analyzePath('/working').exists) mujoco.FS.mkdir('/working');
-
-  let xml;
-  try {
-    xml = await (await fetch(`./assets/scenes/${scenePath}`)).text();
-  } catch (e) {
-    throw new Error(`scene not found: ${scenePath}`);
-  }
-
-  const virtualPath = `/working/${scenePath}`;
-  const dir = virtualPath.substring(0, virtualPath.lastIndexOf('/'));
-  const parts = dir.split('/').filter(Boolean);
-  let cur = '';
-  for (const p of parts) {
-    cur += `/${p}`;
-    if (!mujoco.FS.analyzePath(cur).exists) mujoco.FS.mkdir(cur);
-  }
-  mujoco.FS.writeFile(virtualPath, xml);
-
-  if (data) data.delete();
-  if (model) model.delete();
-
-  model = mujoco.MjModel.loadFromXML(virtualPath);
+  // Load MuJoCo model
+  model = mujoco.MjModel.loadFromXML('/working/' + scenePath);
   data = new mujoco.MjData(model);
+
+  // Apply home keyframe
+  if (model.nkey > 0) {
+    data.qpos.set(model.key_qpos.slice(0, model.nq));
+    for (let i = 0; i < model.nv; i++) data.qvel[i] = 0;
+    if (model.key_ctrl) data.ctrl.set(model.key_ctrl.slice(0, model.nu));
+    mujoco.mj_forward(model, data);
+  }
+
+  // Build Three.js scene from model
+  const built = buildScene(model);
+  mujocoRoot = built.mujocoRoot;
+  bodies = built.bodies;
+  scene.add(mujocoRoot);
+
+  // Setup controller
+  activeController = null;
+  onnxController = null;
+  cpgController = null;
+  stepCounter = 0;
+
+  const cfg = SCENES[scenePath] || {};
+
+  if (cfg.controller === 'onnx') {
+    // OpenDuck ONNX walking
+    model.opt.iterations = 30; // WASM needs more solver iterations
+    onnxController = new OnnxController(mujoco, model, data);
+    const loaded = await onnxController.loadModel('./assets/models/openduck_walk.onnx');
+    if (loaded) {
+      // Warm up physics
+      for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+      onnxController.enabled = true;
+      activeController = 'onnx';
+      updateControllerBtn();
+    }
+  } else if (cfg.controller === 'cpg') {
+    // Unitree H1 CPG walking
+    cpgController = new CpgController(mujoco, model, data);
+    // Warm up physics
+    for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+    cpgController.enabled = true;
+    activeController = 'cpg';
+    updateControllerBtn();
+  }
+
+  // Set camera
+  if (cfg.camera) {
+    camera.position.set(...cfg.camera.pos);
+    controls.target.set(...cfg.camera.target);
+  }
+  controls.update();
+
+  currentScenePath = scenePath;
+  setStatus(`Ready: ${scenePath.split('/').pop()}`);
+}
+
+function updateControllerBtn() {
+  if (!controllerBtn) return;
+  if (activeController === 'onnx') {
+    controllerBtn.textContent = onnxController?.enabled ? 'Policy: ON' : 'Policy: OFF';
+    controllerBtn.style.display = '';
+  } else if (activeController === 'cpg') {
+    controllerBtn.textContent = cpgController?.enabled ? 'CPG: ON' : 'CPG: OFF';
+    controllerBtn.style.display = '';
+  } else {
+    controllerBtn.style.display = 'none';
+  }
+}
+
+function resetScene() {
+  if (!model || !data) return;
 
   if (model.nkey > 0) {
     data.qpos.set(model.key_qpos.slice(0, model.nq));
@@ -123,38 +183,109 @@ async function loadSceneXML(scenePath) {
     mujoco.mj_forward(model, data);
   }
 
-  rebuildSceneMeshes();
-  controls.target.set(0, 0.9, 0);
-  controls.update();
+  // Warm up physics
+  for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+
+  stepCounter = 0;
+
+  if (onnxController) {
+    onnxController.reset();
+    onnxController.enabled = true;
+  }
+  if (cpgController) {
+    cpgController.reset();
+    cpgController.enabled = true;
+  }
+  updateControllerBtn();
 }
 
-async function boot() {
-  setStatus('Loading MuJoCo wasm...');
-  mujoco = await load_mujoco();
-  setStatus('Loading scene: humanoid.xml');
-  await loadSceneXML('humanoid.xml');
-  setStatus('Ready');
+function toggleController() {
+  if (activeController === 'onnx' && onnxController) {
+    onnxController.enabled = !onnxController.enabled;
+  } else if (activeController === 'cpg' && cpgController) {
+    cpgController.enabled = !cpgController.enabled;
+  }
+  updateControllerBtn();
 }
 
-sceneSelect.addEventListener('change', async (e) => {
-  const selected = e.target.value;
-  try {
-    setStatus(`Loading scene: ${selected}`);
-    await loadSceneXML(selected);
-    setStatus(`Ready: ${selected}`);
-  } catch (err) {
-    setStatus(`Failed: ${selected}`);
-    console.warn(err);
+// ─── Keyboard ───────────────────────────────────────────────────────
+function handleKeyboard() {
+  if (activeController === 'onnx' && onnxController && onnxController.enabled) {
+    let linX = onnxController.defaultForwardCommand;
+    let linY = 0;
+    let angZ = 0;
+
+    if (keys['KeyW'] || keys['ArrowUp']) linX = 0.10;
+    if (keys['KeyS'] || keys['ArrowDown']) linX = -0.10;
+    if (keys['KeyA'] || keys['ArrowLeft']) linY = 0.15;
+    if (keys['KeyD'] || keys['ArrowRight']) linY = -0.15;
+    if (keys['KeyQ']) angZ = 0.5;
+    if (keys['KeyE']) angZ = -0.5;
+
+    onnxController.setCommand(linX, linY, angZ);
+  }
+
+  if (activeController === 'cpg' && cpgController && cpgController.enabled) {
+    let fwd = 0.5;
+    let lat = 0;
+    let turn = 0;
+
+    if (keys['KeyW'] || keys['ArrowUp']) fwd = 1.0;
+    if (keys['KeyS'] || keys['ArrowDown']) fwd = -0.5;
+    if (keys['KeyA'] || keys['ArrowLeft']) lat = 0.3;
+    if (keys['KeyD'] || keys['ArrowRight']) lat = -0.3;
+    if (keys['KeyQ']) turn = 0.5;
+    if (keys['KeyE']) turn = -0.5;
+
+    // Stop walking when no movement keys are pressed
+    if (!keys['KeyW'] && !keys['ArrowUp'] && !keys['KeyS'] && !keys['ArrowDown']) {
+      fwd = 0;
+    }
+
+    cpgController.setCommand(fwd, lat, turn);
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+
+  if (e.code === 'Space') {
+    paused = !paused;
+    e.preventDefault();
+  }
+  if (e.code === 'KeyP') {
+    toggleController();
+  }
+  if (e.code === 'KeyR') {
+    resetScene();
+  }
+  if (e.code === 'KeyC') {
+    cameraFollow = !cameraFollow;
+  }
+  if (e.code === 'KeyH') {
+    if (helpOverlay) helpOverlay.style.display = helpOverlay.style.display === 'none' ? '' : 'none';
   }
 });
 
-resetBtn.addEventListener('click', () => {
-  if (!model || !data || model.nkey <= 0) return;
-  data.qpos.set(model.key_qpos.slice(0, model.nq));
-  for (let i = 0; i < model.nv; i++) data.qvel[i] = 0;
-  if (model.key_ctrl) data.ctrl.set(model.key_ctrl.slice(0, model.nu));
-  mujoco.mj_forward(model, data);
+window.addEventListener('keyup', (e) => {
+  keys[e.code] = false;
 });
+
+// ─── UI Events ──────────────────────────────────────────────────────
+sceneSelect.addEventListener('change', async (e) => {
+  try {
+    await loadScene(e.target.value);
+  } catch (err) {
+    setStatus(`Failed: ${e.target.value}`);
+    console.error(err);
+  }
+});
+
+resetBtn.addEventListener('click', resetScene);
+
+if (controllerBtn) {
+  controllerBtn.addEventListener('click', toggleController);
+}
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -162,20 +293,81 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// ─── Update Loop ────────────────────────────────────────────────────
+function updateBodies() {
+  for (const b in bodies) {
+    const body = bodies[b];
+    const idx = parseInt(b);
+    getPosition(data.xpos, idx, body.position);
+    getQuaternion(data.xquat, idx, body.quaternion);
+    body.updateWorldMatrix(false, false);
+  }
+}
+
+function followCamera() {
+  if (!cameraFollow || !model || !data) return;
+
+  // Follow the root body (index 1 = first non-world body)
+  let rootBody = 1;
+  const x = data.xpos[rootBody * 3 + 0];
+  const y = data.xpos[rootBody * 3 + 1];
+  const z = data.xpos[rootBody * 3 + 2];
+
+  // Swizzle: MuJoCo (x,y,z) → Three (x,z,-y)
+  const tx = x;
+  const ty = z;
+  const tz = -y;
+
+  // Smooth follow
+  controls.target.lerp(new THREE.Vector3(tx, ty, tz), 0.05);
+}
+
+// ─── Boot ───────────────────────────────────────────────────────────
 (async () => {
   try {
-    await boot();
+    setStatus('Loading MuJoCo WASM...');
+    mujoco = await load_mujoco();
+
+    // Ensure /working dir exists
+    if (!mujoco.FS.analyzePath('/working').exists) {
+      mujoco.FS.mkdir('/working');
+    }
+
+    await loadScene('humanoid.xml');
+    updateControllerBtn();
   } catch (e) {
     setStatus('Boot failed');
     console.error(e);
+    return;
   }
 
   function animate() {
     requestAnimationFrame(animate);
-    if (model && data) {
+
+    if (model && data && !paused) {
+      handleKeyboard();
+
+      // Physics step
       mujoco.mj_step(model, data);
-      updateGeomMeshes();
+      stepCounter++;
+
+      // CPG controller runs every physics step
+      if (activeController === 'cpg' && cpgController) {
+        cpgController.step();
+      }
+
+      // ONNX controller runs at decimation boundary
+      if (activeController === 'onnx' && onnxController && onnxController.enabled) {
+        onnxController.stepCounter = stepCounter;
+        if (stepCounter % onnxController.decimation === 0) {
+          onnxController.runPolicyAsync();
+        }
+      }
+
+      updateBodies();
+      followCamera();
     }
+
     controls.update();
     renderer.render(scene, camera);
   }
