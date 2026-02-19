@@ -28673,7 +28673,16 @@ var OnnxController = class {
     this.imitationPhase[0] = Math.cos(phase);
     this.imitationPhase[1] = Math.sin(phase);
     const obs = this.getObservation();
-    if (obs.some((v) => isNaN(v))) return;
+    if (obs.some((v) => isNaN(v))) {
+      console.warn(`[Policy #${this.policyStepCount}] NaN in observation! Skipping.`);
+      return;
+    }
+    if (this.policyStepCount <= 5) {
+      const h = (this.data.qpos[2] || 0).toFixed(4);
+      const contacts = this.getFeetContacts();
+      const gyro = [this.data.sensordata[this.gyroAddr], this.data.sensordata[this.gyroAddr + 1], this.data.sensordata[this.gyroAddr + 2]];
+      console.log(`[Policy #${this.policyStepCount}] H=${h} contacts=[${contacts}] gyro=[${gyro.map((v) => v.toFixed(3))}] obs.len=${obs.length} cmd=[${this.commands.slice(0, 3).map((v) => v.toFixed(3))}]`);
+    }
     try {
       const inputTensor = new ort.Tensor("float32", obs, [1, obs.length]);
       const feeds = {};
@@ -28682,6 +28691,9 @@ var OnnxController = class {
       const output = results[this.outputName];
       if (!output) return;
       const action = new Float32Array(output.data);
+      if (this.policyStepCount <= 5) {
+        console.log(`  action=[${Array.from(action).slice(0, 5).map((v) => v.toFixed(3))}...] range=[${Math.min(...action).toFixed(3)}, ${Math.max(...action).toFixed(3)}]`);
+      }
       this.lastLastLastAction.set(this.lastLastAction);
       this.lastLastAction.set(this.lastAction);
       this.lastAction.set(action);
@@ -28990,7 +29002,7 @@ dirLight.position.set(3, 5, 3);
 dirLight.castShadow = true;
 scene.add(dirLight);
 var camera = new PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
-camera.position.set(2, 1.6, 2);
+camera.position.set(3, 2, 3);
 var controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0.9, 0);
 controls.enableDamping = true;
@@ -29007,20 +29019,20 @@ var cameraFollow = true;
 var keys = {};
 var stepCounter = 0;
 var SCENES = {
-  "humanoid.xml": {
-    controller: null,
-    camera: { pos: [2, 1.6, 2], target: [0, 0.9, 0] }
+  "unitree_h1/scene.xml": {
+    controller: "cpg",
+    camera: { pos: [3, 2, 3], target: [0, 0.9, 0] }
   },
   "openduck/scene_flat_terrain.xml": {
     controller: "onnx",
     camera: { pos: [0.5, 0.4, 0.5], target: [0, 0.15, 0] }
   },
-  "unitree_h1/scene.xml": {
-    controller: "cpg",
-    camera: { pos: [3, 2, 3], target: [0, 0.9, 0] }
+  "openduck/scene_flat_terrain_backlash.xml": {
+    controller: "onnx",
+    camera: { pos: [0.5, 0.4, 0.5], target: [0, 0.15, 0] }
   }
 };
-var currentScenePath = "humanoid.xml";
+var currentScenePath = "unitree_h1/scene.xml";
 function setStatus(text) {
   statusEl.textContent = text;
 }
@@ -29045,6 +29057,8 @@ async function loadScene(scenePath) {
   }
   model = mujoco.MjModel.loadFromXML("/working/" + scenePath);
   data = new mujoco.MjData(model);
+  console.log(`Model loaded: nq=${model.nq}, nv=${model.nv}, nu=${model.nu}, ngeom=${model.ngeom}, nbody=${model.nbody}, nkey=${model.nkey}`);
+  console.log(`Timestep: ${model.opt.timestep}, iterations: ${model.opt.iterations}`);
   if (model.nkey > 0) {
     data.qpos.set(model.key_qpos.slice(0, model.nq));
     for (let i = 0; i < model.nv; i++) data.qvel[i] = 0;
@@ -29062,21 +29076,26 @@ async function loadScene(scenePath) {
   const cfg = SCENES[scenePath] || {};
   if (cfg.controller === "onnx") {
     model.opt.iterations = 30;
+    console.log(`Set solver iterations = ${model.opt.iterations}`);
     onnxController = new OnnxController(mujoco, model, data);
     const loaded = await onnxController.loadModel("./assets/models/openduck_walk.onnx");
     if (loaded) {
-      for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+      for (let i = 0; i < 200; i++) mujoco.mj_step(model, data);
+      console.log(`Warm-up done. Height=${data.qpos[2]?.toFixed(4)}`);
       onnxController.enabled = true;
       activeController = "onnx";
-      updateControllerBtn();
     }
   } else if (cfg.controller === "cpg") {
     cpgController = new CpgController(mujoco, model, data);
-    for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+    for (let i = 0; i < 200; i++) {
+      cpgController.step();
+      mujoco.mj_step(model, data);
+    }
+    console.log(`H1 warm-up done. Height=${data.qpos[2]?.toFixed(4)}`);
     cpgController.enabled = true;
     activeController = "cpg";
-    updateControllerBtn();
   }
+  updateControllerBtn();
   if (cfg.camera) {
     camera.position.set(...cfg.camera.pos);
     controls.target.set(...cfg.camera.target);
@@ -29105,14 +29124,18 @@ function resetScene() {
     if (model.key_ctrl) data.ctrl.set(model.key_ctrl.slice(0, model.nu));
     mujoco.mj_forward(model, data);
   }
-  for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
   stepCounter = 0;
   if (onnxController) {
     onnxController.reset();
+    for (let i = 0; i < 200; i++) mujoco.mj_step(model, data);
     onnxController.enabled = true;
   }
   if (cpgController) {
     cpgController.reset();
+    for (let i = 0; i < 200; i++) {
+      cpgController.step();
+      mujoco.mj_step(model, data);
+    }
     cpgController.enabled = true;
   }
   updateControllerBtn();
@@ -29152,6 +29175,7 @@ function handleKeyboard() {
   }
 }
 window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
   keys[e.code] = true;
   if (e.code === "Space") {
     paused = !paused;
@@ -29201,14 +29225,11 @@ function updateBodies() {
 }
 function followCamera() {
   if (!cameraFollow || !model || !data) return;
-  let rootBody = 1;
+  const rootBody = 1;
   const x = data.xpos[rootBody * 3 + 0];
   const y = data.xpos[rootBody * 3 + 1];
   const z = data.xpos[rootBody * 3 + 2];
-  const tx = x;
-  const ty = z;
-  const tz = -y;
-  controls.target.lerp(new Vector3(tx, ty, tz), 0.05);
+  controls.target.lerp(new Vector3(x, z, -y), 0.05);
 }
 (async () => {
   try {
@@ -29217,16 +29238,14 @@ function followCamera() {
     if (!mujoco.FS.analyzePath("/working").exists) {
       mujoco.FS.mkdir("/working");
     }
-    await loadScene("humanoid.xml");
-    updateControllerBtn();
+    await loadScene("unitree_h1/scene.xml");
   } catch (e) {
     setStatus("Boot failed");
     console.error(e);
     return;
   }
   const MAX_SUBSTEPS = 20;
-  function animate() {
-    requestAnimationFrame(animate);
+  async function animate() {
     if (model && data && !paused) {
       handleKeyboard();
       const timestep = model.opt.timestep;
@@ -29241,7 +29260,7 @@ function followCamera() {
         if (activeController === "onnx" && onnxController && onnxController.enabled) {
           onnxController.stepCounter = stepCounter;
           if (stepCounter % onnxController.decimation === 0) {
-            onnxController.runPolicyAsync();
+            await onnxController.runPolicy();
           }
         }
       }
@@ -29250,8 +29269,9 @@ function followCamera() {
     }
     controls.update();
     renderer.render(scene, camera);
+    requestAnimationFrame(animate);
   }
-  animate();
+  requestAnimationFrame(animate);
 })();
 /*! Bundled license information:
 

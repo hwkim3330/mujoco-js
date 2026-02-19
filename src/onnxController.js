@@ -308,7 +308,18 @@ export class OnnxController {
 
     // 2. Build observation
     const obs = this.getObservation();
-    if (obs.some(v => isNaN(v))) return;
+    if (obs.some(v => isNaN(v))) {
+      console.warn(`[Policy #${this.policyStepCount}] NaN in observation! Skipping.`);
+      return;
+    }
+
+    // Diagnostics for first policy steps
+    if (this.policyStepCount <= 5) {
+      const h = (this.data.qpos[2] || 0).toFixed(4);
+      const contacts = this.getFeetContacts();
+      const gyro = [this.data.sensordata[this.gyroAddr], this.data.sensordata[this.gyroAddr+1], this.data.sensordata[this.gyroAddr+2]];
+      console.log(`[Policy #${this.policyStepCount}] H=${h} contacts=[${contacts}] gyro=[${gyro.map(v=>v.toFixed(3))}] obs.len=${obs.length} cmd=[${this.commands.slice(0,3).map(v=>v.toFixed(3))}]`);
+    }
 
     // 3. Run ONNX inference
     try {
@@ -321,6 +332,10 @@ export class OnnxController {
       if (!output) return;
 
       const action = new Float32Array(output.data);
+
+      if (this.policyStepCount <= 5) {
+        console.log(`  action=[${Array.from(action).slice(0,5).map(v=>v.toFixed(3))}...] range=[${Math.min(...action).toFixed(3)}, ${Math.max(...action).toFixed(3)}]`);
+      }
 
       // 4. Update action history AFTER inference
       this.lastLastLastAction.set(this.lastLastAction);

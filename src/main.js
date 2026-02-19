@@ -1,6 +1,6 @@
 /**
  * main.js — MuJoCo WASM + Three.js playground with walking controllers.
- * Supports: humanoid (physics only), OpenDuck (ONNX), Unitree H1 (CPG).
+ * Supports: OpenDuck (ONNX), Unitree H1 (CPG).
  */
 
 import * as THREE from 'three';
@@ -34,7 +34,7 @@ dirLight.castShadow = true;
 scene.add(dirLight);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
-camera.position.set(2.0, 1.6, 2.0);
+camera.position.set(3.0, 2.0, 3.0);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0.9, 0);
 controls.enableDamping = true;
@@ -61,21 +61,21 @@ let stepCounter = 0;
 
 // ─── Scene Config ───────────────────────────────────────────────────
 const SCENES = {
-  'humanoid.xml': {
-    controller: null,
-    camera: { pos: [2.0, 1.6, 2.0], target: [0, 0.9, 0] },
+  'unitree_h1/scene.xml': {
+    controller: 'cpg',
+    camera: { pos: [3.0, 2.0, 3.0], target: [0, 0.9, 0] },
   },
   'openduck/scene_flat_terrain.xml': {
     controller: 'onnx',
     camera: { pos: [0.5, 0.4, 0.5], target: [0, 0.15, 0] },
   },
-  'unitree_h1/scene.xml': {
-    controller: 'cpg',
-    camera: { pos: [3.0, 2.0, 3.0], target: [0, 0.9, 0] },
+  'openduck/scene_flat_terrain_backlash.xml': {
+    controller: 'onnx',
+    camera: { pos: [0.5, 0.4, 0.5], target: [0, 0.15, 0] },
   },
 };
 
-let currentScenePath = 'humanoid.xml';
+let currentScenePath = 'unitree_h1/scene.xml';
 
 // ─── Functions ──────────────────────────────────────────────────────
 function setStatus(text) {
@@ -105,6 +105,9 @@ async function loadScene(scenePath) {
   model = mujoco.MjModel.loadFromXML('/working/' + scenePath);
   data = new mujoco.MjData(model);
 
+  console.log(`Model loaded: nq=${model.nq}, nv=${model.nv}, nu=${model.nu}, ngeom=${model.ngeom}, nbody=${model.nbody}, nkey=${model.nkey}`);
+  console.log(`Timestep: ${model.opt.timestep}, iterations: ${model.opt.iterations}`);
+
   // Apply home keyframe
   if (model.nkey > 0) {
     data.qpos.set(model.key_qpos.slice(0, model.nq));
@@ -130,24 +133,31 @@ async function loadScene(scenePath) {
   if (cfg.controller === 'onnx') {
     // OpenDuck ONNX walking
     model.opt.iterations = 30; // WASM needs more solver iterations
+    console.log(`Set solver iterations = ${model.opt.iterations}`);
+
     onnxController = new OnnxController(mujoco, model, data);
     const loaded = await onnxController.loadModel('./assets/models/openduck_walk.onnx');
     if (loaded) {
-      // Warm up physics
-      for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+      // Warm up physics with ctrl set to default
+      for (let i = 0; i < 200; i++) mujoco.mj_step(model, data);
+      console.log(`Warm-up done. Height=${data.qpos[2]?.toFixed(4)}`);
       onnxController.enabled = true;
       activeController = 'onnx';
-      updateControllerBtn();
     }
   } else if (cfg.controller === 'cpg') {
     // Unitree H1 CPG walking
     cpgController = new CpgController(mujoco, model, data);
     // Warm up physics
-    for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
+    for (let i = 0; i < 200; i++) {
+      cpgController.step(); // PD hold during warm-up
+      mujoco.mj_step(model, data);
+    }
+    console.log(`H1 warm-up done. Height=${data.qpos[2]?.toFixed(4)}`);
     cpgController.enabled = true;
     activeController = 'cpg';
-    updateControllerBtn();
   }
+
+  updateControllerBtn();
 
   // Set camera
   if (cfg.camera) {
@@ -183,17 +193,20 @@ function resetScene() {
     mujoco.mj_forward(model, data);
   }
 
-  // Warm up physics
-  for (let i = 0; i < 100; i++) mujoco.mj_step(model, data);
-
   stepCounter = 0;
 
   if (onnxController) {
     onnxController.reset();
+    // Re-apply ctrl after reset
+    for (let i = 0; i < 200; i++) mujoco.mj_step(model, data);
     onnxController.enabled = true;
   }
   if (cpgController) {
     cpgController.reset();
+    for (let i = 0; i < 200; i++) {
+      cpgController.step();
+      mujoco.mj_step(model, data);
+    }
     cpgController.enabled = true;
   }
   updateControllerBtn();
@@ -242,6 +255,9 @@ function handleKeyboard() {
 }
 
 window.addEventListener('keydown', (e) => {
+  // Ignore if user is typing in an input/select
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
   keys[e.code] = true;
 
   if (e.code === 'Space') {
@@ -303,18 +319,13 @@ function followCamera() {
   if (!cameraFollow || !model || !data) return;
 
   // Follow the root body (index 1 = first non-world body)
-  let rootBody = 1;
+  const rootBody = 1;
   const x = data.xpos[rootBody * 3 + 0];
   const y = data.xpos[rootBody * 3 + 1];
   const z = data.xpos[rootBody * 3 + 2];
 
   // Swizzle: MuJoCo (x,y,z) → Three (x,z,-y)
-  const tx = x;
-  const ty = z;
-  const tz = -y;
-
-  // Smooth follow
-  controls.target.lerp(new THREE.Vector3(tx, ty, tz), 0.05);
+  controls.target.lerp(new THREE.Vector3(x, z, -y), 0.05);
 }
 
 // ─── Boot ───────────────────────────────────────────────────────────
@@ -328,30 +339,28 @@ function followCamera() {
       mujoco.FS.mkdir('/working');
     }
 
-    await loadScene('humanoid.xml');
-    updateControllerBtn();
+    // Default scene: Unitree H1
+    await loadScene('unitree_h1/scene.xml');
   } catch (e) {
     setStatus('Boot failed');
     console.error(e);
     return;
   }
 
-  // Real-time physics: run enough substeps per frame to match wall-clock time.
-  // MuJoCo timestep: 0.002s (500Hz) for OpenDuck/H1, 0.005s (200Hz) for humanoid.
-  const MAX_SUBSTEPS = 20; // Safety cap to prevent freeze on slow frames
+  // Physics substep budget per render frame.
+  // 500Hz physics / 60fps = ~8 substeps. Cap at 20 for safety.
+  const MAX_SUBSTEPS = 20;
 
-  function animate() {
-    requestAnimationFrame(animate);
-
+  async function animate() {
     if (model && data && !paused) {
       handleKeyboard();
 
       const timestep = model.opt.timestep;
-      const frameDt = 1.0 / 60.0; // Target 60fps real-time
+      const frameDt = 1.0 / 60.0;
       const nsteps = Math.min(Math.round(frameDt / timestep), MAX_SUBSTEPS);
 
       for (let s = 0; s < nsteps; s++) {
-        // CPG: set torques BEFORE physics integration
+        // CPG: compute & apply torques BEFORE physics integration
         if (activeController === 'cpg' && cpgController) {
           cpgController.step();
         }
@@ -360,11 +369,12 @@ function followCamera() {
         mujoco.mj_step(model, data);
         stepCounter++;
 
-        // ONNX: run policy AFTER physics step at decimation boundary
+        // ONNX: run policy AFTER physics step at decimation boundary.
+        // Use await so ctrl is applied before next substep batch.
         if (activeController === 'onnx' && onnxController && onnxController.enabled) {
           onnxController.stepCounter = stepCounter;
           if (stepCounter % onnxController.decimation === 0) {
-            onnxController.runPolicyAsync();
+            await onnxController.runPolicy();
           }
         }
       }
@@ -375,7 +385,8 @@ function followCamera() {
 
     controls.update();
     renderer.render(scene, camera);
+    requestAnimationFrame(animate);
   }
 
-  animate();
+  requestAnimationFrame(animate);
 })();
