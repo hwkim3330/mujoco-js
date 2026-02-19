@@ -21,17 +21,31 @@ const helpOverlay = document.getElementById('help-overlay');
 // ─── Three.js Setup ─────────────────────────────────────────────────
 const app = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x11151d);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.0));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(3, 5, 3);
+scene.background = new THREE.Color(0x1a1e28);
+scene.add(new THREE.HemisphereLight(0xc8d8f0, 0x2a3040, 1.2));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+dirLight.position.set(3, 8, 4);
 dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 30;
+dirLight.shadow.camera.left = -5;
+dirLight.shadow.camera.right = 5;
+dirLight.shadow.camera.top = 5;
+dirLight.shadow.camera.bottom = -5;
+dirLight.shadow.bias = -0.0005;
 scene.add(dirLight);
+scene.add(dirLight.target);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
 camera.position.set(3.0, 2.0, 3.0);
@@ -66,6 +80,18 @@ const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 // Step counter for ONNX decimation
 let stepCounter = 0;
 
+// ─── Obstacle System ─────────────────────────────────────────────────
+const NUM_BALLS = 5;
+const NUM_BOXES = 5;
+const NUM_OBSTACLES = NUM_BALLS + NUM_BOXES;
+const HIDE_Z = -50;
+
+let obstacleQposBase = -1;
+let obstacleQvelBase = -1;
+let nextBall = 0;
+let nextBox = 0;
+let currentObstacleScale = 1;
+
 // ─── Scene Config ───────────────────────────────────────────────────
 const SCENES = {
   'unitree_h1/scene.xml': {
@@ -83,6 +109,97 @@ const SCENES = {
 };
 
 let currentScenePath = 'openduck/scene_flat_terrain_backlash.xml';
+
+// ─── Obstacle XML Generation ────────────────────────────────────────
+function generateArenaXML(sceneXml, scale) {
+  let xml = sceneXml;
+
+  const colors = [
+    '0.95 0.25 0.2 1',
+    '0.2 0.55 0.95 1',
+    '0.2 0.85 0.35 1',
+    '0.95 0.75 0.15 1',
+    '0.85 0.3 0.7 1',
+  ];
+
+  let obsXml = '\n  <worldbody>\n';
+  for (let i = 0; i < NUM_BALLS; i++) {
+    const r = (0.015 + i * 0.004) * scale;
+    const m = (0.03 * scale * scale).toFixed(3);
+    obsXml += `    <body name="obstacle_${i}" pos="0 0 ${HIDE_Z}"><freejoint name="obs_fj_${i}"/><geom type="sphere" size="${r.toFixed(4)}" rgba="${colors[i]}" mass="${m}" contype="1" conaffinity="1"/></body>\n`;
+  }
+  for (let i = 0; i < NUM_BOXES; i++) {
+    const r = (0.012 + i * 0.003) * scale;
+    const m = (0.04 * scale * scale).toFixed(3);
+    const idx = NUM_BALLS + i;
+    obsXml += `    <body name="obstacle_${idx}" pos="0 0 ${HIDE_Z}"><freejoint name="obs_fj_${idx}"/><geom type="box" size="${r.toFixed(4)} ${r.toFixed(4)} ${r.toFixed(4)}" rgba="${colors[i]}" mass="${m}" contype="1" conaffinity="1"/></body>\n`;
+  }
+  obsXml += '  </worldbody>\n';
+
+  xml = xml.replace('</mujoco>', obsXml + '</mujoco>');
+
+  // Extend keyframe qpos (each freejoint = 7 DOFs: pos + quat)
+  const obsQpos = Array(NUM_OBSTACLES).fill(`0 0 ${HIDE_Z} 1 0 0 0`).join(' ');
+  xml = xml.replace(
+    /(qpos\s*=\s*")([\s\S]*?)(")/,
+    (m, pre, content, post) => pre + content.trimEnd() + ' ' + obsQpos + '\n    ' + post
+  );
+
+  return xml;
+}
+
+function findObstacleIndices() {
+  obstacleQposBase = -1;
+  obstacleQvelBase = -1;
+  try {
+    const bodyId = mujoco.mj_name2id(model, 1, 'obstacle_0');
+    if (bodyId < 0) return;
+    for (let j = 0; j < model.njnt; j++) {
+      if (model.jnt_bodyid[j] === bodyId) {
+        obstacleQposBase = model.jnt_qposadr[j];
+        obstacleQvelBase = model.jnt_dofadr[j];
+        break;
+      }
+    }
+    console.log(`Obstacles: qposBase=${obstacleQposBase}, qvelBase=${obstacleQvelBase}`);
+  } catch (e) {
+    console.warn('Could not find obstacle indices:', e);
+  }
+}
+
+function spawnObstacle(type) {
+  if (obstacleQposBase < 0 || !model || !data) return;
+
+  let idx;
+  if (type === 'box') {
+    idx = NUM_BALLS + (nextBox % NUM_BOXES);
+    nextBox++;
+  } else {
+    idx = nextBall % NUM_BALLS;
+    nextBall++;
+  }
+
+  const rx = data.qpos[0];
+  const ry = data.qpos[1];
+  const rz = data.qpos[2];
+
+  const angle = Math.random() * Math.PI * 2;
+  const dist = (0.15 + Math.random() * 0.25) * currentObstacleScale;
+
+  const base = obstacleQposBase + idx * 7;
+  data.qpos[base + 0] = rx + Math.cos(angle) * dist;
+  data.qpos[base + 1] = ry + Math.sin(angle) * dist;
+  data.qpos[base + 2] = rz + 0.2 * currentObstacleScale;
+  data.qpos[base + 3] = 1;
+  data.qpos[base + 4] = 0;
+  data.qpos[base + 5] = 0;
+  data.qpos[base + 6] = 0;
+
+  const vbase = obstacleQvelBase + idx * 6;
+  for (let v = 0; v < 6; v++) data.qvel[vbase + v] = 0;
+
+  mujoco.mj_forward(model, data);
+}
 
 // ─── Functions ──────────────────────────────────────────────────────
 function setStatus(text) {
@@ -103,13 +220,20 @@ async function loadScene(scenePath) {
   // Load assets to VFS
   await loadSceneAssets(mujoco, scenePath, setStatus);
 
+  // Generate arena XML with obstacles
+  currentObstacleScale = scenePath.includes('unitree') ? 3.5 : 1;
+  const originalXml = new TextDecoder().decode(mujoco.FS.readFile('/working/' + scenePath));
+  const arenaXml = generateArenaXML(originalXml, currentObstacleScale);
+  const arenaPath = scenePath.replace('.xml', '_arena.xml');
+  mujoco.FS.writeFile('/working/' + arenaPath, arenaXml);
+
   // Clean up old model
   clearScene();
   if (data) { data.delete(); data = null; }
   if (model) { model.delete(); model = null; }
 
-  // Load MuJoCo model
-  model = mujoco.MjModel.loadFromXML('/working/' + scenePath);
+  // Load MuJoCo model (arena with obstacles)
+  model = mujoco.MjModel.loadFromXML('/working/' + arenaPath);
   data = new mujoco.MjData(model);
 
   console.log(`Model loaded: nq=${model.nq}, nv=${model.nv}, nu=${model.nu}, ngeom=${model.ngeom}, nbody=${model.nbody}, nkey=${model.nkey}`);
@@ -164,6 +288,9 @@ async function loadScene(scenePath) {
     activeController = 'cpg';
   }
 
+  findObstacleIndices();
+  nextBall = 0;
+  nextBox = 0;
   updateControllerBtn();
 
   // Set camera
@@ -201,6 +328,8 @@ function resetScene() {
   }
 
   stepCounter = 0;
+  nextBall = 0;
+  nextBox = 0;
 
   if (onnxController) {
     onnxController.reset();
@@ -308,6 +437,9 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.code === 'KeyH') {
     if (helpOverlay) helpOverlay.style.display = helpOverlay.style.display === 'none' ? '' : 'none';
+  }
+  if (e.code === 'KeyF') {
+    spawnObstacle(Math.random() < 0.5 ? 'ball' : 'box');
   }
 });
 
@@ -452,8 +584,11 @@ function setupTouch() {
       }
 
       // Tap actions
-      if (action === 'reset') {
-        btn.addEventListener('touchstart', (e) => { e.preventDefault(); resetScene(); }, { passive: false });
+      if (action === 'ball') {
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); spawnObstacle('ball'); }, { passive: false });
+      }
+      if (action === 'box') {
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); spawnObstacle('box'); }, { passive: false });
       }
       if (action === 'toggle') {
         btn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleController(); }, { passive: false });
@@ -516,6 +651,10 @@ function setupTouch() {
 
       updateBodies();
       followCamera();
+
+      // Shadow follows camera target
+      dirLight.position.set(controls.target.x + 3, controls.target.y + 8, controls.target.z + 4);
+      dirLight.target.position.copy(controls.target);
     }
 
     controls.update();

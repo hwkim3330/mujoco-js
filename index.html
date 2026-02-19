@@ -99,6 +99,7 @@
       <kbd>Q</kbd><kbd>E</kbd> Rotate<br>
       <kbd>P</kbd> Toggle controller<br>
       <kbd>R</kbd> Reset pose<br>
+      <kbd>F</kbd> Spawn obstacle<br>
       <kbd>Space</kbd> Pause<br>
       <kbd>C</kbd> Camera follow<br>
       <kbd>H</kbd> Hide this
@@ -111,10 +112,13 @@
       </div>
     </div>
 
-    <!-- Mobile: Right-side buttons (bottom→top: rotation, toggle, reset) -->
+    <!-- Mobile: Right-side buttons (bottom→top: rotation, spawn, toggle) -->
     <div id="mobile-panel">
-      <div class="mb mb-lg" data-action="reset">RST</div>
       <div class="mb mb-lg" data-action="toggle">P</div>
+      <div class="mb-row">
+        <div class="mb mb-sm" data-action="ball" style="color:#f55">&#x25CF;</div>
+        <div class="mb mb-sm" data-action="box" style="color:#59f">&#x25A0;</div>
+      </div>
       <div class="mb-row">
         <div class="mb mb-sm" data-action="rotL">&#x21BA;</div>
         <div class="mb mb-sm" data-action="rotR">&#x21BB;</div>
