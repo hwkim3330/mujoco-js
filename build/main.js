@@ -29363,21 +29363,72 @@ function followCamera() {
   const z = data.xpos[rootBody * 3 + 2];
   controls.target.lerp(new Vector3(x, z, -y), 0.05);
 }
-function setupTouch() {
-  if (!isTouchDevice) return;
+function setupControls() {
   const joystickZone = document.getElementById("joystick-zone");
   const joystickBase = document.getElementById("joystick-base");
   const joystickThumb = document.getElementById("joystick-thumb");
   const mobilePanel = document.getElementById("mobile-panel");
   const helpOverlayEl = document.getElementById("help-overlay");
+  const headJoystick = document.getElementById("head-joystick");
+  const headJBase = document.getElementById("head-jbase");
+  const headJThumb = document.getElementById("head-jthumb");
+  if (headJoystick && headJBase && headJThumb) {
+    if (!isTouchDevice) {
+      document.body.appendChild(headJoystick);
+      headJoystick.style.position = "fixed";
+      headJoystick.style.bottom = "28px";
+      headJoystick.style.right = "20px";
+      headJoystick.style.zIndex = "20";
+    }
+    const hR = 45, hT = 18, hMax = 30;
+    let headPid = null;
+    const updateHead = (x, y) => {
+      const r = headJBase.getBoundingClientRect();
+      let dx = x - (r.left + hR), dy = y - (r.top + hR);
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d > hMax) {
+        dx *= hMax / d;
+        dy *= hMax / d;
+      }
+      headJThumb.style.left = hR - hT + dx + "px";
+      headJThumb.style.top = hR - hT + dy + "px";
+      headX = dx / hMax;
+      headY = -dy / hMax;
+    };
+    const resetHead = () => {
+      headJThumb.style.left = hR - hT + "px";
+      headJThumb.style.top = hR - hT + "px";
+      headX = 0;
+      headY = 0;
+      headPid = null;
+    };
+    headJoystick.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      headPid = e.pointerId;
+      headJoystick.setPointerCapture(e.pointerId);
+      updateHead(e.clientX, e.clientY);
+    });
+    headJoystick.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== headPid) return;
+      updateHead(e.clientX, e.clientY);
+    });
+    headJoystick.addEventListener("pointerup", (e) => {
+      if (e.pointerId === headPid) resetHead();
+    });
+    headJoystick.addEventListener("pointercancel", (e) => {
+      if (e.pointerId === headPid) resetHead();
+    });
+  }
+  if (!isTouchDevice) return;
   if (joystickZone) joystickZone.style.display = "block";
   if (mobilePanel) mobilePanel.style.display = "flex";
   if (helpOverlayEl) helpOverlayEl.style.display = "none";
-  if (joystickBase && joystickThumb) {
+  if (joystickZone && joystickBase && joystickThumb) {
     const baseRadius = 65;
     const thumbHalf = 24;
     const maxDist = 40;
-    let joystickActive = false;
+    let movePid = null;
     const updateThumb = (clientX, clientY) => {
       const rect = joystickBase.getBoundingClientRect();
       const cx = rect.left + baseRadius;
@@ -29399,110 +29450,65 @@ function setupTouch() {
       joystickThumb.style.top = baseRadius - thumbHalf + "px";
       touchX = 0;
       touchY = 0;
-      joystickActive = false;
+      movePid = null;
     };
-    joystickZone.addEventListener("touchstart", (e) => {
+    joystickZone.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      joystickActive = true;
-      updateThumb(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    joystickZone.addEventListener("touchmove", (e) => {
-      e.preventDefault();
-      if (!joystickActive) return;
-      updateThumb(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: false });
-    joystickZone.addEventListener("touchend", (e) => {
-      e.preventDefault();
-      resetThumb();
-    }, { passive: false });
-    joystickZone.addEventListener("touchcancel", resetThumb);
-  }
-  const headJoystick = document.getElementById("head-joystick");
-  const headJBase = document.getElementById("head-jbase");
-  const headJThumb = document.getElementById("head-jthumb");
-  if (headJoystick && headJBase && headJThumb) {
-    const hR = 45, hT = 18, hMax = 30;
-    let headTid = null;
-    const updateHead = (x, y) => {
-      const r = headJBase.getBoundingClientRect();
-      let dx = x - (r.left + hR), dy = y - (r.top + hR);
-      const d = Math.sqrt(dx * dx + dy * dy);
-      if (d > hMax) {
-        dx *= hMax / d;
-        dy *= hMax / d;
-      }
-      headJThumb.style.left = hR - hT + dx + "px";
-      headJThumb.style.top = hR - hT + dy + "px";
-      headX = dx / hMax;
-      headY = -dy / hMax;
-    };
-    const resetHead = () => {
-      headJThumb.style.left = hR - hT + "px";
-      headJThumb.style.top = hR - hT + "px";
-      headX = 0;
-      headY = 0;
-      headTid = null;
-    };
-    const findTouch = (touches, id) => {
-      for (let i = 0; i < touches.length; i++) {
-        if (touches[i].identifier === id) return touches[i];
-      }
-      return null;
-    };
-    headJoystick.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      const t = e.changedTouches[0];
-      headTid = t.identifier;
-      updateHead(t.clientX, t.clientY);
-    }, { passive: false });
-    headJoystick.addEventListener("touchmove", (e) => {
-      e.preventDefault();
-      if (headTid === null) return;
-      const t = findTouch(e.touches, headTid);
-      if (t) updateHead(t.clientX, t.clientY);
-    }, { passive: false });
-    headJoystick.addEventListener("touchend", (e) => {
-      e.preventDefault();
-      if (headTid !== null && findTouch(e.changedTouches, headTid)) resetHead();
-    }, { passive: false });
-    headJoystick.addEventListener("touchcancel", resetHead);
+      e.stopPropagation();
+      movePid = e.pointerId;
+      joystickZone.setPointerCapture(e.pointerId);
+      updateThumb(e.clientX, e.clientY);
+    });
+    joystickZone.addEventListener("pointermove", (e) => {
+      if (e.pointerId !== movePid) return;
+      updateThumb(e.clientX, e.clientY);
+    });
+    joystickZone.addEventListener("pointerup", (e) => {
+      if (e.pointerId === movePid) resetThumb();
+    });
+    joystickZone.addEventListener("pointercancel", (e) => {
+      if (e.pointerId === movePid) resetThumb();
+    });
   }
   if (mobilePanel) {
     mobilePanel.querySelectorAll("[data-action]").forEach((btn) => {
       const action = btn.dataset.action;
       if (action === "rotL" || action === "rotR") {
-        btn.addEventListener("touchstart", (e) => {
+        btn.addEventListener("pointerdown", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           if (action === "rotL") touchRotL = true;
           if (action === "rotR") touchRotR = true;
-        }, { passive: false });
-        btn.addEventListener("touchend", (e) => {
-          e.preventDefault();
+        });
+        btn.addEventListener("pointerup", () => {
           if (action === "rotL") touchRotL = false;
           if (action === "rotR") touchRotR = false;
-        }, { passive: false });
-        btn.addEventListener("touchcancel", () => {
+        });
+        btn.addEventListener("pointercancel", () => {
           touchRotL = false;
           touchRotR = false;
         });
       }
       if (action === "ball") {
-        btn.addEventListener("touchstart", (e) => {
+        btn.addEventListener("pointerdown", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           spawnObstacle("ball");
-        }, { passive: false });
+        });
       }
       if (action === "box") {
-        btn.addEventListener("touchstart", (e) => {
+        btn.addEventListener("pointerdown", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           spawnObstacle("box");
-        }, { passive: false });
+        });
       }
       if (action === "toggle") {
-        btn.addEventListener("touchstart", (e) => {
+        btn.addEventListener("pointerdown", (e) => {
           e.preventDefault();
+          e.stopPropagation();
           toggleController();
-        }, { passive: false });
+        });
       }
     });
   }
@@ -29515,7 +29521,7 @@ function setupTouch() {
       mujoco.FS.mkdir("/working");
     }
     await loadScene("openduck/scene_flat_terrain_backlash.xml");
-    setupTouch();
+    setupControls();
   } catch (e) {
     setStatus("Boot failed");
     console.error(e);

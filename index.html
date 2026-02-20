@@ -35,7 +35,7 @@
       #joystick-base {
         width: 130px; height: 130px; border-radius: 50%;
         background: rgba(255,255,255,0.06); border: 2px solid rgba(255,255,255,0.18);
-        position: relative;
+        position: relative; touch-action: none;
       }
       #joystick-thumb {
         width: 48px; height: 48px; border-radius: 50%;
@@ -62,7 +62,7 @@
       .mb-sm { width: 44px; height: 44px; font-size: 16px; }
       .mb-row { display: flex; gap: 10px; }
 
-      /* Head control joystick (mobile) */
+      /* Head control joystick (all devices — pointer events) */
       #head-joystick, #head-jbase, #head-jthumb { touch-action: none; }
       #head-jbase {
         width: 90px; height: 90px; border-radius: 50%;
