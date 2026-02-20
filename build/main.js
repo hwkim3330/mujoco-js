@@ -28699,6 +28699,12 @@ var OnnxController = class {
       for (let i = 0; i < this.numDofs; i++) {
         this.motorTargets[i] = this.defaultActuator[i] + action[i] * this.actionScale;
       }
+      if (Math.abs(this.commands[3]) > 0.05) {
+        this.motorTargets[5] = this.defaultActuator[5] + this.commands[3];
+      }
+      if (Math.abs(this.commands[5]) > 0.05) {
+        this.motorTargets[7] = this.defaultActuator[7] + this.commands[5];
+      }
       for (let i = 0; i < this.numDofs; i++) {
         const maxChange = this.maxMotorVelocity * this.ctrlDt;
         const diff = this.motorTargets[i] - this.prevMotorTargets[i];
@@ -28987,6 +28993,7 @@ var statusEl = document.getElementById("status");
 var sceneSelect = document.getElementById("scene-select");
 var resetBtn = document.getElementById("btn-reset");
 var controllerBtn = document.getElementById("btn-controller");
+var speedBtn = document.getElementById("btn-speed");
 var helpOverlay = document.getElementById("help-overlay");
 var app = document.getElementById("app");
 var renderer = new WebGLRenderer({ antialias: true });
@@ -29016,6 +29023,8 @@ var cpgController = null;
 var activeController = null;
 var paused = false;
 var cameraFollow = true;
+var simSpeed = 1;
+var SIM_SPEEDS = [0.25, 0.5, 1, 2, 4];
 var keys = {};
 var touchX = 0;
 var touchY = 0;
@@ -29251,6 +29260,14 @@ function toggleController() {
   }
   updateControllerBtn();
 }
+function cycleSpeed() {
+  const idx = SIM_SPEEDS.indexOf(simSpeed);
+  simSpeed = SIM_SPEEDS[(idx + 1) % SIM_SPEEDS.length];
+  updateSpeedBtn();
+}
+function updateSpeedBtn() {
+  if (speedBtn) speedBtn.textContent = simSpeed + "x";
+}
 function handleInput() {
   const kbFwd = keys["KeyW"] || keys["ArrowUp"];
   const kbBack = keys["KeyS"] || keys["ArrowDown"];
@@ -29325,6 +29342,20 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyF") {
     spawnObstacle(Math.random() < 0.5 ? "ball" : "box");
   }
+  if (e.code === "BracketRight") {
+    const idx = SIM_SPEEDS.indexOf(simSpeed);
+    if (idx < SIM_SPEEDS.length - 1) {
+      simSpeed = SIM_SPEEDS[idx + 1];
+      updateSpeedBtn();
+    }
+  }
+  if (e.code === "BracketLeft") {
+    const idx = SIM_SPEEDS.indexOf(simSpeed);
+    if (idx > 0) {
+      simSpeed = SIM_SPEEDS[idx - 1];
+      updateSpeedBtn();
+    }
+  }
 });
 window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
@@ -29340,6 +29371,9 @@ sceneSelect.addEventListener("change", async (e) => {
 resetBtn.addEventListener("click", resetScene);
 if (controllerBtn) {
   controllerBtn.addEventListener("click", toggleController);
+}
+if (speedBtn) {
+  speedBtn.addEventListener("click", cycleSpeed);
 }
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -29527,13 +29561,13 @@ function setupControls() {
     console.error(e);
     return;
   }
-  const MAX_SUBSTEPS = 20;
+  const MAX_SUBSTEPS = 40;
   async function animate() {
     if (model && data && !paused) {
       handleInput();
       const timestep = model.opt.timestep;
       const frameDt = 1 / 60;
-      const nsteps = Math.min(Math.round(frameDt / timestep), MAX_SUBSTEPS);
+      const nsteps = Math.min(Math.round(frameDt / timestep * simSpeed), MAX_SUBSTEPS);
       for (let s = 0; s < nsteps; s++) {
         if (activeController === "cpg" && cpgController) {
           cpgController.step();

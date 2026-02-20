@@ -346,6 +346,16 @@ export class OnnxController {
         this.motorTargets[i] = this.defaultActuator[i] + action[i] * this.actionScale;
       }
 
+      // 5b. Direct head control: override head joints when user input present
+      // Joint indices: 5=neck_pitch, 7=head_yaw
+      // Policy observation still includes commands so legs compensate for balance
+      if (Math.abs(this.commands[3]) > 0.05) {
+        this.motorTargets[5] = this.defaultActuator[5] + this.commands[3];
+      }
+      if (Math.abs(this.commands[5]) > 0.05) {
+        this.motorTargets[7] = this.defaultActuator[7] + this.commands[5];
+      }
+
       // 6. Velocity clamp
       for (let i = 0; i < this.numDofs; i++) {
         const maxChange = this.maxMotorVelocity * this.ctrlDt;

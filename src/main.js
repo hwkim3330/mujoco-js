@@ -16,6 +16,7 @@ const statusEl = document.getElementById('status');
 const sceneSelect = document.getElementById('scene-select');
 const resetBtn = document.getElementById('btn-reset');
 const controllerBtn = document.getElementById('btn-controller');
+const speedBtn = document.getElementById('btn-speed');
 const helpOverlay = document.getElementById('help-overlay');
 
 // ─── Three.js Setup ─────────────────────────────────────────────────
@@ -53,6 +54,8 @@ let activeController = null; // 'onnx' | 'cpg' | null
 
 let paused = false;
 let cameraFollow = true;
+let simSpeed = 1.0;
+const SIM_SPEEDS = [0.25, 0.5, 1.0, 2.0, 4.0];
 
 // Keyboard state
 const keys = {};
@@ -346,6 +349,16 @@ function toggleController() {
   updateControllerBtn();
 }
 
+function cycleSpeed() {
+  const idx = SIM_SPEEDS.indexOf(simSpeed);
+  simSpeed = SIM_SPEEDS[(idx + 1) % SIM_SPEEDS.length];
+  updateSpeedBtn();
+}
+
+function updateSpeedBtn() {
+  if (speedBtn) speedBtn.textContent = simSpeed + 'x';
+}
+
 // ─── Keyboard ───────────────────────────────────────────────────────
 function handleInput() {
   // Merge keyboard + touch input
@@ -440,6 +453,14 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyF') {
     spawnObstacle(Math.random() < 0.5 ? 'ball' : 'box');
   }
+  if (e.code === 'BracketRight') {
+    const idx = SIM_SPEEDS.indexOf(simSpeed);
+    if (idx < SIM_SPEEDS.length - 1) { simSpeed = SIM_SPEEDS[idx + 1]; updateSpeedBtn(); }
+  }
+  if (e.code === 'BracketLeft') {
+    const idx = SIM_SPEEDS.indexOf(simSpeed);
+    if (idx > 0) { simSpeed = SIM_SPEEDS[idx - 1]; updateSpeedBtn(); }
+  }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -460,6 +481,9 @@ resetBtn.addEventListener('click', resetScene);
 
 if (controllerBtn) {
   controllerBtn.addEventListener('click', toggleController);
+}
+if (speedBtn) {
+  speedBtn.addEventListener('click', cycleSpeed);
 }
 
 window.addEventListener('resize', () => {
@@ -674,7 +698,7 @@ function setupControls() {
 
   // Physics substep budget per render frame.
   // 500Hz physics / 60fps = ~8 substeps. Cap at 20 for safety.
-  const MAX_SUBSTEPS = 20;
+  const MAX_SUBSTEPS = 40;
 
   async function animate() {
     if (model && data && !paused) {
@@ -682,7 +706,7 @@ function setupControls() {
 
       const timestep = model.opt.timestep;
       const frameDt = 1.0 / 60.0;
-      const nsteps = Math.min(Math.round(frameDt / timestep), MAX_SUBSTEPS);
+      const nsteps = Math.min(Math.round(frameDt / timestep * simSpeed), MAX_SUBSTEPS);
 
       for (let s = 0; s < nsteps; s++) {
         // CPG: compute & apply torques BEFORE physics integration
